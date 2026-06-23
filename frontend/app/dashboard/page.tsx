@@ -4,16 +4,28 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
+  buscarOportunidades,
   clearToken,
   getMe,
   getToken,
   listOpportunities,
+  listProfiles,
   updatePostulacion,
   type EstadoPostulacion,
   type Me,
   type Postulacion,
+  type SearchProfile,
 } from "@/lib/api";
 import DetalleDrawer from "./DetalleDrawer";
+
+function haceCuanto(iso: string | null): string {
+  if (!iso) return "nunca";
+  const seg = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (seg < 60) return "hace un momento";
+  if (seg < 3600) return `hace ${Math.floor(seg / 60)} min`;
+  if (seg < 86400) return `hace ${Math.floor(seg / 3600)} h`;
+  return `hace ${Math.floor(seg / 86400)} día(s)`;
+}
 
 const COLUMNAS: { estado: EstadoPostulacion; titulo: string; color: string }[] = [
   { estado: "nueva", titulo: "Nuevas", color: "bg-blue-50 border-blue-200" },
@@ -40,14 +52,40 @@ export default function Dashboard() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
   const [posts, setPosts] = useState<Postulacion[]>([]);
+  const [profiles, setProfiles] = useState<SearchProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [seleccion, setSeleccion] = useState<number | null>(null);
+  const [buscando, setBuscando] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   async function cargar() {
-    const [meData, oportunidades] = await Promise.all([getMe(), listOpportunities()]);
+    const [meData, oportunidades, perfiles] = await Promise.all([
+      getMe(),
+      listOpportunities(),
+      listProfiles(),
+    ]);
     setMe(meData);
     setPosts(oportunidades);
+    setProfiles(perfiles);
     setLoading(false);
+  }
+
+  async function buscar() {
+    setBuscando(true);
+    setAviso(null);
+    try {
+      const res = await buscarOportunidades();
+      await cargar();
+      setAviso(
+        res.nuevas > 0
+          ? `✓ Encontramos ${res.nuevas} oportunidad(es) nueva(s).`
+          : "Búsqueda completa. No hay procesos nuevos por ahora."
+      );
+    } catch {
+      setAviso("No se pudo completar la búsqueda. Intenta de nuevo.");
+    } finally {
+      setBuscando(false);
+    }
   }
 
   useEffect(() => {
@@ -98,15 +136,56 @@ export default function Dashboard() {
       </header>
 
       <div className="px-6 py-6">
-        <h1 className="text-2xl font-bold">Tus oportunidades</h1>
-        <p className="text-gray-600">
-          {posts.length} proceso(s) detectados por el rastreador para tu empresa.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Tus oportunidades</h1>
+            <p className="text-gray-600">
+              {posts.length} proceso(s) que encajan con tu perfil · última búsqueda{" "}
+              {haceCuanto(me?.company.last_searched_at ?? null)}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={buscar}
+              disabled={buscando || profiles.length === 0}
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50"
+            >
+              {buscando ? "Buscando en SECOP…" : "🔄 Buscar ahora"}
+            </button>
+            {aviso && <span className="text-xs text-gray-600">{aviso}</span>}
+          </div>
+        </div>
 
-        {posts.length === 0 && (
-          <div className="mt-8 rounded-xl border border-dashed border-gray-300 p-10 text-center text-gray-500">
-            Todavía no hay oportunidades. Cuando el rastreador encuentre procesos de SECOP
-            que encajen con tu perfil de búsqueda, aparecerán aquí.
+        {/* Guía paso a paso para que el flujo se entienda solo */}
+        {profiles.length === 0 && (
+          <div className="mt-6 rounded-xl border border-teal-200 bg-teal-50 p-6">
+            <p className="font-semibold">👋 Empecemos · Paso 1 de 2</p>
+            <p className="mt-1 text-sm text-gray-600">
+              Crea tu perfil de búsqueda (tu sector y dónde operas) para que el radar sepa qué
+              vigilar en SECOP por ti.
+            </p>
+            <Link
+              href="/dashboard/perfiles"
+              className="mt-3 inline-block rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
+            >
+              Crear mi perfil →
+            </Link>
+          </div>
+        )}
+        {profiles.length > 0 && posts.length === 0 && (
+          <div className="mt-6 rounded-xl border border-teal-200 bg-teal-50 p-6">
+            <p className="font-semibold">Paso 2 de 2 · Busca oportunidades</p>
+            <p className="mt-1 text-sm text-gray-600">
+              Ya tienes {profiles.length} perfil(es). Presiona <strong>Buscar ahora</strong> y el
+              radar revisará SECOP. También lo hace solo cada día.
+            </p>
+            <button
+              onClick={buscar}
+              disabled={buscando}
+              className="mt-3 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50"
+            >
+              {buscando ? "Buscando…" : "🔄 Buscar ahora"}
+            </button>
           </div>
         )}
 

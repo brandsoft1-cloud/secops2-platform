@@ -10,11 +10,26 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_current_user
 from app.database import get_db
+from app.models.company import Company
 from app.models.postulacion import EstadoPostulacion, Postulacion
 from app.models.user import User
-from app.schemas.opportunity import PostulacionOut, PostulacionUpdate
+from app.schemas.opportunity import BuscarResult, PostulacionOut, PostulacionUpdate
 
 router = APIRouter(prefix="/api/opportunities", tags=["oportunidades"])
+
+
+@router.post("/buscar", response_model=BuscarResult)
+def buscar(current: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Dispara una búsqueda en SECOP para la empresa y devuelve cuántas nuevas halló.
+
+    Es el botón "Buscar ahora": el usuario controla y ve el resultado al instante.
+    """
+    # Import diferido: el worker es opcional y trae dependencias de red.
+    from worker.rastreador import ejecutar_pasada
+
+    nuevas = ejecutar_pasada(company_id=current.company_id)
+    company = db.get(Company, current.company_id)
+    return BuscarResult(nuevas=nuevas, last_searched_at=company.last_searched_at if company else None)
 
 
 @router.get("", response_model=list[PostulacionOut])

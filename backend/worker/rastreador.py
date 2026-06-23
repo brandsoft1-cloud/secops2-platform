@@ -17,6 +17,7 @@ import argparse
 import logging
 import time
 from collections import defaultdict
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -65,13 +66,24 @@ def _consultas_geograficas(perfiles: list[SearchProfile]) -> list[dict[str, str 
     return [{"departamento": d, "ciudad": c} for d, c in sorted(specs, key=lambda s: (s[0] or "", s[1] or ""))]
 
 
-def ejecutar_pasada(limit: int | None = 1000) -> None:
+def ejecutar_pasada(limit: int | None = 1000, company_id: int | None = None) -> int:
+    """Corre una búsqueda y devuelve cuántas oportunidades NUEVAS se encontraron.
+
+    Si se pasa company_id, busca solo para los perfiles de esa empresa (lo usa el
+    botón "Buscar ahora"); si no, para todas (lo usa el rastreador en bucle).
+    """
     db = SessionLocal()
     try:
-        perfiles = db.scalars(select(SearchProfile).where(SearchProfile.active.is_(True))).all()
+        stmt = select(SearchProfile).where(SearchProfile.active.is_(True))
+        if company_id is not None:
+            stmt = stmt.where(SearchProfile.company_id == company_id)
+        perfiles = db.scalars(stmt).all()
         if not perfiles:
             logger.info("No hay perfiles de búsqueda activos; nada que emparejar.")
-            return
+            # Aun sin perfiles, deja registro de que se intentó buscar.
+            _marcar_busqueda(db, {company_id} if company_id is not None else set())
+            db.commit()
+            return 0
         # company_id -> lista de oportunidades nuevas que le coinciden
         nuevas_por_empresa: dict[int, list[Opportunity]] = defaultdict(list)
         # (company_id, opportunity_id) ya emparejados en esta pasada. SECOP trae
@@ -112,17 +124,21 @@ def ejecutar_pasada(limit: int | None = 1000) -> None:
                     db.add(Postulacion(company_id=perfil.company_id, opportunity_id=opp.id))
                     nuevas_por_empresa[perfil.company_id].append(opp)
 
+        # Marca cuándo se buscó por última vez para cada empresa consultada.
+        _marcar_busqueda(db, {p.company_id for p in perfiles})
         db.commit()
         logger.info("Procesados %d procesos de SECOP (estados abiertos).", total)
 
         # Alertas por correo
-        for company_id, oportunidades in nuevas_por_empresa.items():
-            company = db.get(Company, company_id)
+        for cid, oportunidades in nuevas_por_empresa.items():
+            company = db.get(Company, cid)
             if not company or not company.users:
                 continue
             destinatario = company.users[0].email
             alertar_oportunidades(destinatario, company.name, oportunidades)
             logger.info("Alertadas %d oportunidades a %s", len(oportunidades), company.name)
+
+        return sum(len(v) for v in nuevas_por_empresa.values())
 
     except Exception:
         db.rollback()
@@ -130,6 +146,14 @@ def ejecutar_pasada(limit: int | None = 1000) -> None:
         raise
     finally:
         db.close()
+
+
+def _marcar_busqueda(db: Session, company_ids: set[int]) -> None:
+    ahora = datetime.now(timezone.utc)
+    for cid in company_ids:
+        company = db.get(Company, cid)
+        if company:
+            company.last_searched_at = ahora
 
 
 def main() -> None:

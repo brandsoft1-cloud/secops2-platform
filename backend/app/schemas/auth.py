@@ -30,6 +30,7 @@ class CompanyOut(BaseModel):
     nit: str | None
     plan: Plan
     trial_ends_at: datetime
+    last_searched_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 

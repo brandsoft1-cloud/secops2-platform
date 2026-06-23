@@ -27,6 +27,8 @@ class Company(Base):
     nit: Mapped[str | None] = mapped_column(String(30), nullable=True)
     plan: Mapped[Plan] = mapped_column(Enum(Plan), default=Plan.GRATIS)
     trial_ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_trial_end)
+    # Última vez que el rastreador buscó oportunidades para esta empresa.
+    last_searched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

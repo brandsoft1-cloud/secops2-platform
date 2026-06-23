@@ -49,6 +49,12 @@ class OpportunityOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# --- Resultado de "Buscar ahora" ---
+class BuscarResult(BaseModel):
+    nuevas: int
+    last_searched_at: datetime | None = None
+
+
 # --- Postulacion (CRM) ---
 class PostulacionUpdate(BaseModel):
     estado: EstadoPostulacion | None = None

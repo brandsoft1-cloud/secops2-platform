@@ -74,10 +74,25 @@ export interface Me {
   id: number;
   email: string;
   full_name: string | null;
-  company: { id: number; name: string; plan: string; trial_ends_at: string };
+  company: {
+    id: number;
+    name: string;
+    plan: string;
+    trial_ends_at: string;
+    last_searched_at: string | null;
+  };
 }
 
 export const getMe = () => request<Me>("/api/auth/me");
+
+export interface BuscarResult {
+  nuevas: number;
+  last_searched_at: string | null;
+}
+
+// Dispara la búsqueda en SECOP para la empresa (botón "Buscar ahora").
+export const buscarOportunidades = () =>
+  request<BuscarResult>("/api/opportunities/buscar", { method: "POST" });
 
 // --- Oportunidades (CRM) ---
 export type EstadoPostulacion =
