@@ -26,3 +26,6 @@ yarn-debug.log*
 # Datos locales
 *.sqlite3
 *.db
+
+# TS build info
+*.tsbuildinfo
