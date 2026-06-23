@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
+    smtp_use_tls: bool = True  # STARTTLS; ponlo en false para un servidor local de pruebas
     smtp_from: str = "Radar de Licitaciones <alertas@example.com>"
 
     # WhatsApp (Fase 2)

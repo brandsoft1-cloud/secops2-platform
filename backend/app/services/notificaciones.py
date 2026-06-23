@@ -42,7 +42,8 @@ def enviar_email(destinatario: str, asunto: str, cuerpo: str) -> None:
     msg.set_content(cuerpo)
 
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-        server.starttls()
+        if settings.smtp_use_tls:
+            server.starttls()
         if settings.smtp_user:
             server.login(settings.smtp_user, settings.smtp_password)
         server.send_message(msg)
