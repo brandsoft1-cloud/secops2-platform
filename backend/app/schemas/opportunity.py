@@ -13,6 +13,7 @@ class SearchProfileBase(BaseModel):
     sector: str | None = None
     keywords: list[str] = Field(default_factory=list)
     ciudad: str | None = None
+    departamento: str | None = None
     presupuesto_min: Decimal | None = None
     presupuesto_max: Decimal | None = None
     active: bool = True

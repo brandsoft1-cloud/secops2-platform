@@ -46,18 +46,23 @@ def _guardar_oportunidad(db: Session, datos: dict) -> tuple[Opportunity, bool]:
     return opp, True
 
 
-def _consultas_por_ciudad(perfiles: list[SearchProfile]) -> list[str | None]:
-    """Ciudades a consultar en SECOP según los perfiles activos.
+def _consultas_geograficas(perfiles: list[SearchProfile]) -> list[dict[str, str | None]]:
+    """Consultas a SECOP según el alcance de cada perfil activo.
 
-    Consultar dirigido por ciudad es lo que hace útil al radar: el nicho de una
-    pyme casi nunca cae en los N procesos más recientes a nivel nacional. Si
-    algún perfil no fija ciudad, se añade una consulta global (None).
+    Cada perfil define su alcance: por departamento (todo el depto.) o por
+    ciudad. Consultar dirigido es lo que hace útil al radar: el nicho de una pyme
+    casi nunca cae en los N procesos más recientes a nivel nacional. Se deduplican
+    las consultas; si un perfil no fija ni depto. ni ciudad, se hace una global.
     """
-    ciudades = {p.ciudad for p in perfiles if p.ciudad}
-    consultas: list[str | None] = sorted(ciudades)
-    if any(not p.ciudad for p in perfiles):
-        consultas.append(None)
-    return consultas
+    specs: set[tuple[str | None, str | None]] = set()
+    for p in perfiles:
+        if p.departamento:
+            specs.add((p.departamento, None))   # depto. completo
+        elif p.ciudad:
+            specs.add((None, p.ciudad))
+        else:
+            specs.add((None, None))             # global
+    return [{"departamento": d, "ciudad": c} for d, c in sorted(specs, key=lambda s: (s[0] or "", s[1] or ""))]
 
 
 def ejecutar_pasada(limit: int | None = 1000) -> None:
@@ -69,11 +74,16 @@ def ejecutar_pasada(limit: int | None = 1000) -> None:
             return
         # company_id -> lista de oportunidades nuevas que le coinciden
         nuevas_por_empresa: dict[int, list[Opportunity]] = defaultdict(list)
+        # (company_id, opportunity_id) ya emparejados en esta pasada. SECOP trae
+        # varias filas por proceso (lotes/fases), así que la misma oportunidad
+        # puede repetirse; las postulaciones pendientes aún no están en la BD.
+        vistas: set[tuple[int, int]] = set()
 
         total = 0
-        for ciudad in _consultas_por_ciudad(perfiles):
+        for consulta in _consultas_geograficas(perfiles):
             for datos in secop.fetch_procesos(
-                ciudad=ciudad,
+                ciudad=consulta["ciudad"],
+                departamento=consulta["departamento"],
                 estados=settings.secop_estados_abiertos,
                 desde_dias=settings.secop_dias_recientes,
                 limit=limit,
@@ -86,6 +96,10 @@ def ejecutar_pasada(limit: int | None = 1000) -> None:
                 for perfil in perfiles:
                     if not coincide(opp, perfil):
                         continue
+                    clave = (perfil.company_id, opp.id)
+                    if clave in vistas:
+                        continue
+                    vistas.add(clave)
                     # ¿Ya existe postulación de esta empresa para esta oportunidad?
                     ya_existe = db.scalar(
                         select(Postulacion).where(

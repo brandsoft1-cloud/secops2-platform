@@ -22,7 +22,10 @@ def coincide(opp: Opportunity, profile: SearchProfile) -> bool:
     if not profile.active:
         return False
 
-    # Ciudad (si el perfil la especifica)
+    # Alcance geográfico (cada uno filtra solo si el perfil lo especifica).
+    if profile.departamento:
+        if _normaliza_texto(profile.departamento) not in _normaliza_texto(opp.departamento):
+            return False
     if profile.ciudad:
         if _normaliza_texto(profile.ciudad) not in _normaliza_texto(opp.ciudad):
             return False

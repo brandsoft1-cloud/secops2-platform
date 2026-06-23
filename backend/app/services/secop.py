@@ -77,6 +77,7 @@ def _get_con_reintento(client: httpx.Client, params: dict, headers: dict) -> lis
 def fetch_procesos(
     *,
     ciudad: str | None = None,
+    departamento: str | None = None,
     estados: list[str] | None = None,
     desde_dias: int | None = None,
     limit: int | None = None,
@@ -97,6 +98,8 @@ def fetch_procesos(
     where_clauses = []
     if ciudad:
         where_clauses.append(f"upper(ciudad_entidad) like upper('%{_escape(ciudad)}%')")
+    if departamento:
+        where_clauses.append(f"upper(departamento_entidad) like upper('%{_escape(departamento)}%')")
     if estados:
         en_lista = ",".join(f"'{_escape(e)}'" for e in estados)
         where_clauses.append(f"estado_del_procedimiento in ({en_lista})")

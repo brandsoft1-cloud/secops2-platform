@@ -18,7 +18,10 @@ class SearchProfile(Base):
     sector: Mapped[str | None] = mapped_column(String(120), nullable=True)
     # Lista de palabras clave, p.ej. ["catering", "alimentación", "refrigerios"]
     keywords: Mapped[list] = mapped_column(JSON, default=list)
+    # Alcance geográfico. Si se fija departamento, el radar busca en todo el
+    # departamento; ciudad lo acota aún más. Cada uno filtra solo si está puesto.
     ciudad: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    departamento: Mapped[str | None] = mapped_column(String(120), nullable=True)
     presupuesto_min: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
     presupuesto_max: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
