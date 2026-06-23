@@ -29,3 +29,6 @@ yarn-debug.log*
 
 # TS build info
 *.tsbuildinfo
+
+# Documentos subidos (almacenamiento local)
+backend/storage/

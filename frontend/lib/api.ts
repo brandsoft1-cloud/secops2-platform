@@ -167,3 +167,51 @@ export const updateProfile = (id: number, data: Partial<SearchProfile>) =>
 
 export const deleteProfile = (id: number) =>
   request<void>(`/api/profiles/${id}`, { method: "DELETE" });
+
+// --- Documentos por postulación ---
+export interface Documento {
+  id: number;
+  nombre: string;
+  content_type: string | null;
+  tamano: number;
+  created_at: string;
+}
+
+export const listDocumentos = (postId: number) =>
+  request<Documento[]>(`/api/postulaciones/${postId}/documentos`);
+
+export const deleteDocumento = (id: number) =>
+  request<void>(`/api/documentos/${id}`, { method: "DELETE" });
+
+// La subida usa multipart/form-data; no se puede pasar por request() (que fuerza JSON).
+export async function subirDocumento(postId: number, file: File): Promise<Documento> {
+  const fd = new FormData();
+  fd.append("archivo", file);
+  const token = getToken();
+  const res = await fetch(`${API_URL}/api/postulaciones/${postId}/documentos`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: fd,
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(detail.detail ?? `Error ${res.status}`);
+  }
+  return res.json();
+}
+
+// Descarga con el token en el header (no sirve un <a href> simple).
+export async function descargarDocumento(id: number, nombre: string): Promise<void> {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/api/documentos/${id}/download`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error("No se pudo descargar");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  a.click();
+  URL.revokeObjectURL(url);
+}

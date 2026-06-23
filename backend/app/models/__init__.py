@@ -4,6 +4,7 @@ from app.models.user import User
 from app.models.search_profile import SearchProfile
 from app.models.opportunity import Opportunity
 from app.models.postulacion import Postulacion, EstadoPostulacion
+from app.models.documento import Documento
 
 __all__ = [
     "Company",
@@ -13,4 +14,5 @@ __all__ = [
     "Opportunity",
     "Postulacion",
     "EstadoPostulacion",
+    "Documento",
 ]

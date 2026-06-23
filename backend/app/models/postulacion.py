@@ -43,3 +43,6 @@ class Postulacion(Base):
 
     company: Mapped["Company"] = relationship(back_populates="postulaciones")  # noqa: F821
     opportunity: Mapped["Opportunity"] = relationship()  # noqa: F821
+    documentos: Mapped[list["Documento"]] = relationship(  # noqa: F821
+        back_populates="postulacion", cascade="all, delete-orphan"
+    )

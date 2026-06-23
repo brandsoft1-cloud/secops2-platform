@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api.routes import auth, health, opportunities, profiles
+from app.api.routes import auth, documentos, health, opportunities, profiles
 
 
 # El esquema de la base de datos se gestiona con migraciones Alembic.
@@ -26,6 +26,7 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(profiles.router)
 app.include_router(opportunities.router)
+app.include_router(documentos.router)
 
 
 @app.get("/")

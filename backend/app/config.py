@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     # CORS
     frontend_origin: str = "http://localhost:3000"
 
+    # Almacenamiento de documentos. Local por ahora; luego S3/R2.
+    storage_dir: str = "storage"
+    max_upload_mb: int = 20
+
     # SECOP II
     secop_dataset_url: str = "https://www.datos.gov.co/resource/p6dx-8zbt.json"
     secop_app_token: str = ""

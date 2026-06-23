@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { EstadoPostulacion, Postulacion } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import {
+  deleteDocumento,
+  descargarDocumento,
+  listDocumentos,
+  subirDocumento,
+  type Documento,
+  type EstadoPostulacion,
+  type Postulacion,
+} from "@/lib/api";
 
 const ESTADOS: { estado: EstadoPostulacion; label: string }[] = [
   { estado: "nueva", label: "Nueva" },
@@ -55,13 +63,44 @@ export default function DetalleDrawer({
   const [notas, setNotas] = useState(post.notas ?? "");
   const [guardando, setGuardando] = useState(false);
   const [guardado, setGuardado] = useState(false);
+  const [docs, setDocs] = useState<Documento[]>([]);
+  const [subiendo, setSubiendo] = useState(false);
+  const [errorDoc, setErrorDoc] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   // Solo al cambiar de postulación (no al guardar, que actualiza post.notas).
   useEffect(() => {
     setNotas(post.notas ?? "");
     setGuardado(false);
+    setErrorDoc(null);
+    listDocumentos(post.id).then(setDocs).catch(() => setDocs([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post.id]);
+
+  async function onArchivo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSubiendo(true);
+    setErrorDoc(null);
+    try {
+      await subirDocumento(post.id, file);
+      setDocs(await listDocumentos(post.id));
+    } catch (err) {
+      setErrorDoc(err instanceof Error ? err.message : "No se pudo subir");
+    } finally {
+      setSubiendo(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  }
+
+  async function quitarDoc(id: number) {
+    await deleteDocumento(id);
+    setDocs((d) => d.filter((x) => x.id !== id));
+  }
+
+  function pesoKB(b: number) {
+    return b < 1024 ? `${b} B` : `${Math.round(b / 1024)} KB`;
+  }
 
   const vencida = o.fecha_cierre ? new Date(o.fecha_cierre) < new Date() : false;
 
@@ -128,8 +167,8 @@ export default function DetalleDrawer({
           <section>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Requisitos y documentos</p>
             <p className="text-sm text-gray-600">
-              Los pliegos y la lista exacta de documentos están en el proceso en SECOP.
-              Documentos que suelen pedir:
+              Prepara aquí tus documentos. Los pliegos exactos están en SECOP; la oferta se
+              presenta allá. Suelen pedir:
             </p>
             <ul className="mt-2 space-y-1">
               {DOCS_TIPICOS.map((d) => (
@@ -138,6 +177,41 @@ export default function DetalleDrawer({
                 </li>
               ))}
             </ul>
+
+            {/* Mis documentos */}
+            <div className="mt-4 rounded-lg border border-gray-200 p-3">
+              <p className="text-sm font-medium">Mis documentos ({docs.length})</p>
+              {docs.length === 0 && (
+                <p className="mt-1 text-xs text-gray-400">Aún no has subido documentos.</p>
+              )}
+              <ul className="mt-2 space-y-2">
+                {docs.map((d) => (
+                  <li key={d.id} className="flex items-center justify-between gap-2 text-sm">
+                    <button
+                      onClick={() => descargarDocumento(d.id, d.nombre)}
+                      className="truncate text-left text-brand hover:underline"
+                      title={d.nombre}
+                    >
+                      📄 {d.nombre}
+                    </button>
+                    <span className="shrink-0 text-xs text-gray-400">{pesoKB(d.tamano)}</span>
+                    <button onClick={() => quitarDoc(d.id)} className="shrink-0 text-xs text-red-500 hover:underline">
+                      Quitar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <input ref={fileInput} type="file" onChange={onArchivo} className="hidden" />
+              <button
+                onClick={() => fileInput.current?.click()}
+                disabled={subiendo}
+                className="mt-3 rounded-lg border border-brand px-3 py-1.5 text-sm text-brand hover:bg-teal-50 disabled:opacity-50"
+              >
+                {subiendo ? "Subiendo…" : "+ Subir documento"}
+              </button>
+              {errorDoc && <p className="mt-1 text-xs text-red-500">{errorDoc}</p>}
+            </div>
+
             {o.url && (
               <a
                 href={o.url}
@@ -145,12 +219,9 @@ export default function DetalleDrawer({
                 rel="noreferrer"
                 className="mt-3 inline-block rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white hover:bg-brand-dark"
               >
-                Ver pliegos y requisitos en SECOP ↗
+                Presentar oferta en SECOP ↗
               </a>
             )}
-            <p className="mt-2 text-xs text-gray-400">
-              Pronto podrás adjuntar aquí tus documentos para cada postulación.
-            </p>
           </section>
 
           {/* Notas */}

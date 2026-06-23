@@ -49,6 +49,17 @@ class OpportunityOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# --- Documentos ---
+class DocumentoOut(BaseModel):
+    id: int
+    nombre: str
+    content_type: str | None
+    tamano: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # --- Resultado de "Buscar ahora" ---
 class BuscarResult(BaseModel):
     nuevas: int
