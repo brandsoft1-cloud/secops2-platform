@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   clearToken,
   getMe,
@@ -77,6 +78,9 @@ export default function Dashboard() {
       <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
         <span className="font-bold text-brand">🎯 Radar de Licitaciones</span>
         <div className="flex items-center gap-4 text-sm">
+          <Link href="/dashboard/perfiles" className="text-gray-500 hover:text-brand">
+            ⚙ Perfiles de búsqueda
+          </Link>
           <span className="text-gray-600">
             {me?.company.name} · plan <strong className="uppercase">{me?.company.plan}</strong>
           </span>

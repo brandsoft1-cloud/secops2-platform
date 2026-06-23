@@ -125,6 +125,7 @@ export interface SearchProfile {
   sector: string | null;
   keywords: string[];
   ciudad: string | null;
+  departamento: string | null;
   presupuesto_min: number | null;
   presupuesto_max: number | null;
   active: boolean;
@@ -137,3 +138,12 @@ export const createProfile = (data: Partial<SearchProfile>) =>
     method: "POST",
     body: JSON.stringify(data),
   });
+
+export const updateProfile = (id: number, data: Partial<SearchProfile>) =>
+  request<SearchProfile>(`/api/profiles/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+
+export const deleteProfile = (id: number) =>
+  request<void>(`/api/profiles/${id}`, { method: "DELETE" });
