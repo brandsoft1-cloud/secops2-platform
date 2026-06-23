@@ -23,6 +23,13 @@ class Settings(BaseSettings):
     secop_app_token: str = ""
     secop_poll_seconds: int = 3600
     secop_page_size: int = 500
+    # Estados del procedimiento en los que una pyme todavía puede ofertar.
+    # El dataset también trae "Seleccionado"/"Evaluación"/"Cancelado" (ya cerrados),
+    # que NO deben generar alertas.
+    secop_estados_abiertos: list[str] = ["Abierto", "Publicado"]
+    # Ventana de recencia: solo procesos publicados en los últimos N días.
+    # Acota el volumen (evita paginación profunda) y define qué es "nuevo".
+    secop_dias_recientes: int = 30
 
     # Correo (SMTP)
     smtp_host: str = ""

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import unicodedata
+from datetime import datetime, timezone
 
 from app.models.opportunity import Opportunity
 from app.models.search_profile import SearchProfile
@@ -40,6 +41,22 @@ def coincide(opp: Opportunity, profile: SearchProfile) -> bool:
             return False
 
     return True
+
+
+def esta_vigente(opp: Opportunity, ahora: datetime | None = None) -> bool:
+    """True si todavía se puede ofertar (la fecha de recepción no ha pasado).
+
+    El estado del procedimiento ("Abierto"/"Publicado") no basta: algunos siguen
+    marcados como abiertos pero su fecha de recepción de ofertas ya venció. Si la
+    oportunidad no trae fecha de cierre, no la descartamos (mejor avisar de más).
+    """
+    if opp.fecha_cierre is None:
+        return True
+    ahora = ahora or datetime.now(timezone.utc)
+    cierre = opp.fecha_cierre
+    if cierre.tzinfo is None:
+        cierre = cierre.replace(tzinfo=timezone.utc)
+    return cierre >= ahora
 
 
 def perfiles_que_coinciden(opp: Opportunity, profiles: list[SearchProfile]) -> list[SearchProfile]:

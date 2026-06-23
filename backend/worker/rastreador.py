@@ -28,7 +28,7 @@ from app.models.opportunity import Opportunity
 from app.models.postulacion import Postulacion
 from app.models.search_profile import SearchProfile
 from app.services import secop
-from app.services.matching import coincide
+from app.services.matching import coincide, esta_vigente
 from app.services.notificaciones import alertar_oportunidades
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -46,37 +46,60 @@ def _guardar_oportunidad(db: Session, datos: dict) -> tuple[Opportunity, bool]:
     return opp, True
 
 
+def _consultas_por_ciudad(perfiles: list[SearchProfile]) -> list[str | None]:
+    """Ciudades a consultar en SECOP según los perfiles activos.
+
+    Consultar dirigido por ciudad es lo que hace útil al radar: el nicho de una
+    pyme casi nunca cae en los N procesos más recientes a nivel nacional. Si
+    algún perfil no fija ciudad, se añade una consulta global (None).
+    """
+    ciudades = {p.ciudad for p in perfiles if p.ciudad}
+    consultas: list[str | None] = sorted(ciudades)
+    if any(not p.ciudad for p in perfiles):
+        consultas.append(None)
+    return consultas
+
+
 def ejecutar_pasada(limit: int | None = 1000) -> None:
     db = SessionLocal()
     try:
         perfiles = db.scalars(select(SearchProfile).where(SearchProfile.active.is_(True))).all()
         if not perfiles:
             logger.info("No hay perfiles de búsqueda activos; nada que emparejar.")
+            return
         # company_id -> lista de oportunidades nuevas que le coinciden
         nuevas_por_empresa: dict[int, list[Opportunity]] = defaultdict(list)
 
         total = 0
-        for datos in secop.fetch_procesos(limit=limit):
-            total += 1
-            opp, es_nueva = _guardar_oportunidad(db, datos)
+        for ciudad in _consultas_por_ciudad(perfiles):
+            for datos in secop.fetch_procesos(
+                ciudad=ciudad,
+                estados=settings.secop_estados_abiertos,
+                desde_dias=settings.secop_dias_recientes,
+                limit=limit,
+            ):
+                total += 1
+                opp, es_nueva = _guardar_oportunidad(db, datos)
 
-            for perfil in perfiles:
-                if not coincide(opp, perfil):
+                if not esta_vigente(opp):
                     continue
-                # ¿Ya existe postulación de esta empresa para esta oportunidad?
-                ya_existe = db.scalar(
-                    select(Postulacion).where(
-                        Postulacion.company_id == perfil.company_id,
-                        Postulacion.opportunity_id == opp.id,
+                for perfil in perfiles:
+                    if not coincide(opp, perfil):
+                        continue
+                    # ¿Ya existe postulación de esta empresa para esta oportunidad?
+                    ya_existe = db.scalar(
+                        select(Postulacion).where(
+                            Postulacion.company_id == perfil.company_id,
+                            Postulacion.opportunity_id == opp.id,
+                        )
                     )
-                )
-                if ya_existe:
-                    continue
-                db.add(Postulacion(company_id=perfil.company_id, opportunity_id=opp.id))
-                nuevas_por_empresa[perfil.company_id].append(opp)
+                    if ya_existe:
+                        continue
+                    db.add(Postulacion(company_id=perfil.company_id, opportunity_id=opp.id))
+                    nuevas_por_empresa[perfil.company_id].append(opp)
 
         db.commit()
-        logger.info("Procesados %d procesos de SECOP.", total)
+        logger.info("Procesados %d procesos de SECOP (estados abiertos).", total)
 
         # Alertas por correo
         for company_id, oportunidades in nuevas_por_empresa.items():

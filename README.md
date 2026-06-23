@@ -16,13 +16,20 @@ PostgreSQL  base multiusuario
 
 | Pieza                              | Estado |
 |------------------------------------|--------|
-| Conexión a la API de SECOP II      | esqueleto (`app/services/secop.py`) |
-| Filtro por ciudad/sector/keywords  | esqueleto (`app/services/matching.py`) |
-| Almacenamiento + detección de nuevos| esqueleto (worker + modelos) |
-| Notificación correo / WhatsApp     | esqueleto (`app/services/notificaciones.py`) |
-| Login / cuentas / planes           | esqueleto (`app/api/routes/auth.py`) |
-| Panel CRM + landing                | esqueleto (`frontend/`) |
+| Conexión a la API de SECOP II      | funcional, probado con datos reales (`app/services/secop.py`) |
+| Filtro por ciudad/sector/keywords + vigencia | funcional (`app/services/matching.py`) |
+| Almacenamiento + detección de nuevos| funcional (worker + modelos) |
+| Notificación correo                | funcional (`app/services/notificaciones.py`); WhatsApp en Fase 2 |
+| Login / cuentas / planes           | funcional (`app/api/routes/auth.py`) |
+| Panel CRM + landing                | funcional (`frontend/`) |
 | Pasarela de pagos                  | Fase 2 |
+
+> **Cómo filtra el radar.** SECOP II marca millones de procesos; el rastreador
+> solo trae los de estados **abiertos** (`Abierto`/`Publicado`) publicados en los
+> últimos `SECOP_DIAS_RECIENTES` días, dirigidos por la ciudad de cada perfil.
+> Además descarta los que ya pasaron su fecha de recepción de ofertas
+> (`matching.esta_vigente`), porque "abierto" no siempre significa que aún puedas
+> ofertar.
 
 ## Arranque rápido (desarrollo local)
 

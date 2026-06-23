@@ -9,7 +9,7 @@ si cambias de fuente.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any, Iterator
 
 import httpx
@@ -56,17 +56,38 @@ def _normalizar(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _escape(value: str) -> str:
+    """Escapa comillas simples para interpolar en cláusulas SoQL ($where)."""
+    return value.replace("'", "''")
+
+
+def _get_con_reintento(client: httpx.Client, params: dict, headers: dict) -> list[dict]:
+    """GET a Socrata con un reintento: el dataset es grande y a veces tarda."""
+    for intento in range(2):
+        try:
+            resp = client.get(settings.secop_dataset_url, params=params, headers=headers)
+            resp.raise_for_status()
+            return resp.json()
+        except (httpx.TimeoutException, httpx.TransportError):
+            if intento == 1:
+                raise
+    return []
+
+
 def fetch_procesos(
     *,
     ciudad: str | None = None,
-    estado: str | None = None,
+    estados: list[str] | None = None,
+    desde_dias: int | None = None,
     limit: int | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Genera procesos normalizados desde SECOP, paginando con $limit/$offset.
 
-    Filtra del lado del servidor por ciudad/estado cuando se indica, para no
-    descargar de más. El emparejamiento fino (keywords, presupuesto) lo hace
-    `matching.py` sobre el resultado.
+    Filtra del lado del servidor por ciudad, estados del procedimiento y
+    recencia (`desde_dias`) cuando se indica, para no descargar de más: el
+    dataset tiene >8M filas (la mayoría ya adjudicadas) y la paginación profunda
+    sobre un resultado ordenado se degrada hasta dar timeout. El emparejamiento
+    fino (keywords, presupuesto) lo hace `matching.py` sobre el resultado.
     """
     page_size = settings.secop_page_size
     headers = {}
@@ -75,21 +96,23 @@ def fetch_procesos(
 
     where_clauses = []
     if ciudad:
-        where_clauses.append(f"upper(ciudad_entidad) like upper('%{ciudad}%')")
-    if estado:
-        where_clauses.append(f"upper(estado_del_procedimiento) = upper('{estado}')")
+        where_clauses.append(f"upper(ciudad_entidad) like upper('%{_escape(ciudad)}%')")
+    if estados:
+        en_lista = ",".join(f"'{_escape(e)}'" for e in estados)
+        where_clauses.append(f"estado_del_procedimiento in ({en_lista})")
+    if desde_dias:
+        corte = (datetime.now(timezone.utc) - timedelta(days=desde_dias)).strftime("%Y-%m-%dT00:00:00")
+        where_clauses.append(f"fecha_de_publicacion_del >= '{corte}'")
 
     offset = 0
     descargados = 0
-    with httpx.Client(timeout=30) as client:
+    with httpx.Client(timeout=60) as client:
         while True:
             params: dict[str, Any] = {"$limit": page_size, "$offset": offset, "$order": "fecha_de_publicacion_del DESC"}
             if where_clauses:
                 params["$where"] = " AND ".join(where_clauses)
 
-            resp = client.get(settings.secop_dataset_url, params=params, headers=headers)
-            resp.raise_for_status()
-            rows = resp.json()
+            rows = _get_con_reintento(client, params, headers)
             if not rows:
                 break
 
