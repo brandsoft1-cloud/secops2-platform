@@ -49,6 +49,8 @@ def _normalizar(row: dict[str, Any]) -> dict[str, Any]:
         "ciudad": row.get("ciudad") or row.get("ciudad_entidad"),
         "departamento": row.get("departamento") or row.get("departamento_entidad"),
         "estado_secop": row.get("estado_del_procedimiento") or row.get("fase"),
+        "modalidad": row.get("modalidad_de_contratacion"),
+        "tipo_contrato": row.get("tipo_de_contrato"),
         "fecha_publicacion": _to_dt(row.get("fecha_de_publicacion_del")),
         "fecha_cierre": _to_dt(row.get("fecha_de_recepcion_de") or row.get("fecha_de_cierre")),
         "url": row.get("urlproceso", {}).get("url") if isinstance(row.get("urlproceso"), dict) else row.get("urlproceso"),

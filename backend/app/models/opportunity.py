@@ -23,6 +23,8 @@ class Opportunity(Base):
     ciudad: Mapped[str | None] = mapped_column(String(120), index=True, nullable=True)
     departamento: Mapped[str | None] = mapped_column(String(120), nullable=True)
     estado_secop: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    modalidad: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    tipo_contrato: Mapped[str | None] = mapped_column(String(200), nullable=True)
     fecha_publicacion: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     fecha_cierre: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     url: Mapped[str | None] = mapped_column(Text, nullable=True)

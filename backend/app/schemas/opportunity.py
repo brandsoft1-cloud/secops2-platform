@@ -40,6 +40,8 @@ class OpportunityOut(BaseModel):
     ciudad: str | None
     departamento: str | None
     estado_secop: str | None
+    modalidad: str | None
+    tipo_contrato: str | None
     fecha_publicacion: datetime | None
     fecha_cierre: datetime | None
     url: str | None

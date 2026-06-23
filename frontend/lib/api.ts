@@ -94,6 +94,11 @@ export interface Opportunity {
   objeto: string | null;
   valor: number | null;
   ciudad: string | null;
+  departamento: string | null;
+  estado_secop: string | null;
+  modalidad: string | null;
+  tipo_contrato: string | null;
+  fecha_publicacion: string | null;
   fecha_cierre: string | null;
   url: string | null;
 }

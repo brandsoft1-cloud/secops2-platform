@@ -13,6 +13,7 @@ import {
   type Me,
   type Postulacion,
 } from "@/lib/api";
+import DetalleDrawer from "./DetalleDrawer";
 
 const COLUMNAS: { estado: EstadoPostulacion; titulo: string; color: string }[] = [
   { estado: "nueva", titulo: "Nuevas", color: "bg-blue-50 border-blue-200" },
@@ -40,6 +41,7 @@ export default function Dashboard() {
   const [me, setMe] = useState<Me | null>(null);
   const [posts, setPosts] = useState<Postulacion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [seleccion, setSeleccion] = useState<number | null>(null);
 
   async function cargar() {
     const [meData, oportunidades] = await Promise.all([getMe(), listOpportunities()]);
@@ -59,9 +61,14 @@ export default function Dashboard() {
     });
   }, [router]);
 
-  async function mover(post: Postulacion, estado: EstadoPostulacion) {
-    const actualizado = await updatePostulacion(post.id, { estado });
-    setPosts((prev) => prev.map((p) => (p.id === post.id ? actualizado : p)));
+  async function mover(id: number, estado: EstadoPostulacion) {
+    const actualizado = await updatePostulacion(id, { estado });
+    setPosts((prev) => prev.map((p) => (p.id === id ? actualizado : p)));
+  }
+
+  async function guardarNotas(id: number, notas: string) {
+    const actualizado = await updatePostulacion(id, { notas });
+    setPosts((prev) => prev.map((p) => (p.id === id ? actualizado : p)));
   }
 
   function salir() {
@@ -116,7 +123,11 @@ export default function Dashboard() {
                     const o = post.opportunity;
                     const siguiente = SIGUIENTE[post.estado];
                     return (
-                      <article key={post.id} className="rounded-lg bg-white p-3 shadow-sm">
+                      <article
+                        key={post.id}
+                        onClick={() => setSeleccion(post.id)}
+                        className="cursor-pointer rounded-lg bg-white p-3 shadow-sm hover:ring-1 hover:ring-brand"
+                      >
                         <p className="text-xs font-medium text-gray-500">{o.entidad ?? "Entidad"}</p>
                         <p className="mt-1 text-sm font-medium line-clamp-3">{o.objeto ?? "—"}</p>
                         <p className="mt-2 text-xs text-gray-600">{formatoCOP(o.valor)}</p>
@@ -125,20 +136,11 @@ export default function Dashboard() {
                             Cierra: {new Date(o.fecha_cierre).toLocaleDateString("es-CO")}
                           </p>
                         )}
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {o.url && (
-                            <a
-                              href={o.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs text-brand hover:underline"
-                            >
-                              Ver en SECOP ↗
-                            </a>
-                          )}
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span className="text-xs text-brand">Ver detalle →</span>
                           {siguiente && (
                             <button
-                              onClick={() => mover(post, siguiente)}
+                              onClick={(e) => { e.stopPropagation(); mover(post.id, siguiente); }}
                               className="ml-auto rounded bg-brand px-2 py-1 text-xs text-white hover:bg-brand-dark"
                             >
                               → {siguiente}
@@ -146,7 +148,7 @@ export default function Dashboard() {
                           )}
                           {post.estado !== "descartada" && post.estado !== "ganada" && (
                             <button
-                              onClick={() => mover(post, "descartada")}
+                              onClick={(e) => { e.stopPropagation(); mover(post.id, "descartada"); }}
                               className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-500 hover:border-gray-400"
                             >
                               Descartar
@@ -162,6 +164,15 @@ export default function Dashboard() {
           })}
         </div>
       </div>
+
+      {seleccion != null && posts.find((p) => p.id === seleccion) && (
+        <DetalleDrawer
+          post={posts.find((p) => p.id === seleccion)!}
+          onClose={() => setSeleccion(null)}
+          onMover={(estado) => mover(seleccion, estado)}
+          onGuardarNotas={(notas) => guardarNotas(seleccion, notas)}
+        />
+      )}
     </main>
   );
 }
