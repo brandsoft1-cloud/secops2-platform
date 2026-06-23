@@ -37,10 +37,16 @@ def coincide(opp: Opportunity, profile: SearchProfile) -> bool:
         if profile.presupuesto_max is not None and opp.valor > float(profile.presupuesto_max):
             return False
 
+    texto = _normaliza_texto(" ".join(filter(None, [opp.objeto, opp.entidad, opp.estado_secop])))
+
     # Palabras clave: al menos una debe aparecer en entidad/objeto/sector
     if profile.keywords:
-        texto = _normaliza_texto(" ".join(filter(None, [opp.objeto, opp.entidad, opp.estado_secop])))
         if not any(_normaliza_texto(kw) in texto for kw in profile.keywords):
+            return False
+
+    # Exclusiones: si aparece cualquier palabra vetada, se descarta.
+    if profile.exclude_keywords:
+        if any(_normaliza_texto(kw) in texto for kw in profile.exclude_keywords if kw):
             return False
 
     return True

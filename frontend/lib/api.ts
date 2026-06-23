@@ -144,6 +144,7 @@ export interface SearchProfile {
   name: string;
   sector: string | null;
   keywords: string[];
+  exclude_keywords: string[];
   ciudad: string | null;
   departamento: string | null;
   presupuesto_min: number | null;

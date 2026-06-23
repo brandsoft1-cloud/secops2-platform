@@ -29,12 +29,16 @@ const SUGERIDAS = [
   "almuerzos", "víveres", "mercados", "panadería", "raciones",
 ];
 
+// Palabras que descartan ruido común (p.ej. "alimentación animal").
+const EXCL_SUGERIDAS = ["animal", "veterinario", "pecuario", "bovino", "porcino", "mascotas"];
+
 type Form = {
   name: string;
   departamento: string;
   ciudad: string;
   sector: string;
   keywords: string[];
+  exclude_keywords: string[];
   presupuesto_min: string;
   presupuesto_max: string;
   active: boolean;
@@ -46,6 +50,7 @@ const VACIO: Form = {
   ciudad: "",
   sector: "",
   keywords: [],
+  exclude_keywords: [],
   presupuesto_min: "",
   presupuesto_max: "",
   active: true,
@@ -58,6 +63,7 @@ function aForm(p: SearchProfile): Form {
     ciudad: p.ciudad ?? "",
     sector: p.sector ?? "",
     keywords: p.keywords ?? [],
+    exclude_keywords: p.exclude_keywords ?? [],
     presupuesto_min: p.presupuesto_min?.toString() ?? "",
     presupuesto_max: p.presupuesto_max?.toString() ?? "",
     active: p.active,
@@ -71,6 +77,7 @@ export default function PerfilesPage() {
   const [editId, setEditId] = useState<number | null>(null); // null = creando
   const [form, setForm] = useState<Form>(VACIO);
   const [nuevaKw, setNuevaKw] = useState("");
+  const [nuevaExcl, setNuevaExcl] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -120,6 +127,23 @@ export default function PerfilesPage() {
     setNuevaKw("");
   }
 
+  function toggleExcl(kw: string) {
+    setForm((f) => ({
+      ...f,
+      exclude_keywords: f.exclude_keywords.includes(kw)
+        ? f.exclude_keywords.filter((k) => k !== kw)
+        : [...f.exclude_keywords, kw],
+    }));
+  }
+
+  function agregarExcl() {
+    const kw = nuevaExcl.trim().toLowerCase();
+    if (kw && !form.exclude_keywords.includes(kw)) {
+      setForm((f) => ({ ...f, exclude_keywords: [...f.exclude_keywords, kw] }));
+    }
+    setNuevaExcl("");
+  }
+
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -136,6 +160,7 @@ export default function PerfilesPage() {
       name: form.name || "Mi búsqueda",
       sector: form.sector || null,
       keywords: form.keywords,
+      exclude_keywords: form.exclude_keywords,
       ciudad: form.ciudad || null,
       departamento: form.departamento,
       presupuesto_min: form.presupuesto_min ? Number(form.presupuesto_min) : null,
@@ -295,6 +320,46 @@ export default function PerfilesPage() {
                     className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none"
                   />
                   <button type="button" onClick={agregarKw} className="rounded-lg border border-gray-300 px-3 text-sm hover:border-brand">
+                    Agregar
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium">Excluir (palabras a descartar)</label>
+                <p className="text-xs text-gray-500">Evita falsos positivos, p.ej. &quot;animal&quot; para no traer &quot;alimentación animal&quot;.</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {EXCL_SUGERIDAS.map((kw) => {
+                    const on = form.exclude_keywords.includes(kw);
+                    return (
+                      <button
+                        type="button"
+                        key={kw}
+                        onClick={() => toggleExcl(kw)}
+                        className={`rounded-full px-3 py-1 text-xs ${on ? "bg-red-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                      >
+                        {on ? "✓ " : "+ "}{kw}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {form.exclude_keywords.filter((k) => !EXCL_SUGERIDAS.includes(k)).map((k) => (
+                    <span key={k} className="flex items-center gap-1 rounded-full bg-red-500 px-3 py-1 text-xs text-white">
+                      {k}
+                      <button type="button" onClick={() => toggleExcl(k)} className="font-bold">×</button>
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={nuevaExcl}
+                    onChange={(e) => setNuevaExcl(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); agregarExcl(); } }}
+                    placeholder="Agregar palabra a excluir"
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none"
+                  />
+                  <button type="button" onClick={agregarExcl} className="rounded-lg border border-gray-300 px-3 text-sm hover:border-brand">
                     Agregar
                   </button>
                 </div>

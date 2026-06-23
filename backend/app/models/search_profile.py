@@ -18,6 +18,9 @@ class SearchProfile(Base):
     sector: Mapped[str | None] = mapped_column(String(120), nullable=True)
     # Lista de palabras clave, p.ej. ["catering", "alimentación", "refrigerios"]
     keywords: Mapped[list] = mapped_column(JSON, default=list)
+    # Palabras que DESCARTAN una oportunidad aunque coincidan las keywords.
+    # Ej.: "animal", "veterinario" para que "alimentación animal" no entre.
+    exclude_keywords: Mapped[list] = mapped_column(JSON, default=list)
     # Alcance geográfico. Si se fija departamento, el radar busca en todo el
     # departamento; ciudad lo acota aún más. Cada uno filtra solo si está puesto.
     ciudad: Mapped[str | None] = mapped_column(String(120), nullable=True)

@@ -12,6 +12,7 @@ class SearchProfileBase(BaseModel):
     name: str = "Mi búsqueda"
     sector: str | None = None
     keywords: list[str] = Field(default_factory=list)
+    exclude_keywords: list[str] = Field(default_factory=list)
     ciudad: str | None = None
     departamento: str | None = None
     presupuesto_min: Decimal | None = None
