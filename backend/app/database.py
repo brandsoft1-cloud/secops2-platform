@@ -23,9 +23,5 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-def init_db() -> None:
-    """Crea las tablas si no existen. Para producción usar migraciones (Alembic)."""
-    # Importa los modelos para que queden registrados en Base.metadata
-    from app import models  # noqa: F401
-
-    Base.metadata.create_all(bind=engine)
+# El esquema se crea y versiona con Alembic, no con create_all.
+# Para preparar la base: `alembic upgrade head` (ver backend/alembic/).

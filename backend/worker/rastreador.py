@@ -22,7 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database import SessionLocal, init_db
+from app.database import SessionLocal
 from app.models.company import Company
 from app.models.opportunity import Opportunity
 from app.models.postulacion import Postulacion
@@ -101,7 +101,7 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=1000, help="Máx. procesos por pasada")
     args = parser.parse_args()
 
-    init_db()
+    # El esquema lo prepara Alembic (`alembic upgrade head`) antes de correr el worker.
     if args.loop:
         logger.info("Rastreador en bucle cada %d s. Ctrl+C para salir.", settings.secop_poll_seconds)
         while True:

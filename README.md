@@ -39,10 +39,16 @@ cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env        # ajusta secretos si quieres
+alembic upgrade head        # crea/actualiza el esquema de la base
 uvicorn app.main:app --reload
 ```
 
 API y documentación automática en http://localhost:8000/docs
+
+> El esquema se gestiona con **migraciones Alembic** (no `create_all`). Tras
+> cambiar un modelo: `alembic revision --autogenerate -m "descripción"` y luego
+> `alembic upgrade head`. En despliegue, corre `alembic upgrade head` antes de
+> arrancar la API y el worker.
 
 ### 3. Worker (rastreador SECOP)
 
