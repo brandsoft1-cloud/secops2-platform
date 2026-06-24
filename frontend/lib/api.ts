@@ -70,10 +70,13 @@ export async function register(payload: RegisterPayload): Promise<string> {
   return data.access_token;
 }
 
+export type Rol = "admin" | "miembro";
+
 export interface Me {
   id: number;
   email: string;
   full_name: string | null;
+  role: Rol;
   company: {
     id: number;
     name: string;
@@ -118,11 +121,18 @@ export interface Opportunity {
   url: string | null;
 }
 
+export interface Assignee {
+  id: number;
+  full_name: string | null;
+  email: string;
+}
+
 export interface Postulacion {
   id: number;
   estado: EstadoPostulacion;
   notas: string | null;
   updated_at: string;
+  assignee: Assignee | null;
   opportunity: Opportunity;
 }
 
@@ -131,12 +141,38 @@ export const listOpportunities = (estado?: EstadoPostulacion) =>
 
 export const updatePostulacion = (
   id: number,
-  data: { estado?: EstadoPostulacion; notas?: string }
+  data: {
+    estado?: EstadoPostulacion;
+    notas?: string;
+    assignee_id?: number | null;
+    set_assignee?: boolean;
+  }
 ) =>
   request<Postulacion>(`/api/opportunities/${id}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
+
+// --- Equipo (multiusuario) ---
+export interface TeamMember {
+  id: number;
+  email: string;
+  full_name: string | null;
+  role: Rol;
+  is_active: boolean;
+}
+
+export const listTeam = () => request<TeamMember[]>("/api/team");
+
+export const createTeamMember = (data: {
+  email: string;
+  password: string;
+  full_name?: string;
+  role: Rol;
+}) => request<TeamMember>("/api/team", { method: "POST", body: JSON.stringify(data) });
+
+export const deleteTeamMember = (id: number) =>
+  request<void>(`/api/team/${id}`, { method: "DELETE" });
 
 // --- Perfiles de búsqueda ---
 export interface SearchProfile {

@@ -10,11 +10,13 @@ import {
   getToken,
   listOpportunities,
   listProfiles,
+  listTeam,
   updatePostulacion,
   type EstadoPostulacion,
   type Me,
   type Postulacion,
   type SearchProfile,
+  type TeamMember,
 } from "@/lib/api";
 import DetalleDrawer from "./DetalleDrawer";
 
@@ -53,20 +55,23 @@ export default function Dashboard() {
   const [me, setMe] = useState<Me | null>(null);
   const [posts, setPosts] = useState<Postulacion[]>([]);
   const [profiles, setProfiles] = useState<SearchProfile[]>([]);
+  const [team, setTeam] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [seleccion, setSeleccion] = useState<number | null>(null);
   const [buscando, setBuscando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
   async function cargar() {
-    const [meData, oportunidades, perfiles] = await Promise.all([
+    const [meData, oportunidades, perfiles, equipo] = await Promise.all([
       getMe(),
       listOpportunities(),
       listProfiles(),
+      listTeam(),
     ]);
     setMe(meData);
     setPosts(oportunidades);
     setProfiles(perfiles);
+    setTeam(equipo);
     setLoading(false);
   }
 
@@ -109,6 +114,11 @@ export default function Dashboard() {
     setPosts((prev) => prev.map((p) => (p.id === id ? actualizado : p)));
   }
 
+  async function asignar(id: number, assignee_id: number | null) {
+    const actualizado = await updatePostulacion(id, { assignee_id, set_assignee: true });
+    setPosts((prev) => prev.map((p) => (p.id === id ? actualizado : p)));
+  }
+
   function salir() {
     clearToken();
     router.push("/");
@@ -124,7 +134,10 @@ export default function Dashboard() {
         <span className="font-bold text-brand">🎯 Radar de Licitaciones</span>
         <div className="flex items-center gap-4 text-sm">
           <Link href="/dashboard/perfiles" className="text-gray-500 hover:text-brand">
-            ⚙ Perfiles de búsqueda
+            ⚙ Perfiles
+          </Link>
+          <Link href="/dashboard/equipo" className="text-gray-500 hover:text-brand">
+            👥 Equipo
           </Link>
           <span className="text-gray-600">
             {me?.company.name} · plan <strong className="uppercase">{me?.company.plan}</strong>
@@ -215,6 +228,11 @@ export default function Dashboard() {
                             Cierra: {new Date(o.fecha_cierre).toLocaleDateString("es-CO")}
                           </p>
                         )}
+                        {post.assignee && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            👤 {post.assignee.full_name || post.assignee.email}
+                          </p>
+                        )}
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <span className="text-xs text-brand">Ver detalle →</span>
                           {siguiente && (
@@ -247,9 +265,11 @@ export default function Dashboard() {
       {seleccion != null && posts.find((p) => p.id === seleccion) && (
         <DetalleDrawer
           post={posts.find((p) => p.id === seleccion)!}
+          equipo={team}
           onClose={() => setSeleccion(null)}
           onMover={(estado) => mover(seleccion, estado)}
           onGuardarNotas={(notas) => guardarNotas(seleccion, notas)}
+          onAsignar={(assigneeId) => asignar(seleccion, assigneeId)}
         />
       )}
     </main>

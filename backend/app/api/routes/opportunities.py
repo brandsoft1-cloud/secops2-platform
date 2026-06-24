@@ -41,7 +41,7 @@ def listar(
     """Lista las oportunidades de la empresa (su panel/CRM), opcionalmente por estado."""
     stmt = (
         select(Postulacion)
-        .options(joinedload(Postulacion.opportunity))
+        .options(joinedload(Postulacion.opportunity), joinedload(Postulacion.assignee))
         .where(Postulacion.company_id == current.company_id)
         .order_by(Postulacion.updated_at.desc())
     )
@@ -65,6 +65,12 @@ def actualizar(
         post.estado = data.estado
     if data.notas is not None:
         post.notas = data.notas
+    if data.set_assignee:
+        if data.assignee_id is not None:
+            asignado = db.get(User, data.assignee_id)
+            if not asignado or asignado.company_id != current.company_id:
+                raise HTTPException(status_code=400, detail="Responsable inválido")
+        post.assignee_id = data.assignee_id
     db.commit()
     db.refresh(post)
     return post

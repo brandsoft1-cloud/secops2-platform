@@ -9,6 +9,7 @@ import {
   type Documento,
   type EstadoPostulacion,
   type Postulacion,
+  type TeamMember,
 } from "@/lib/api";
 
 const ESTADOS: { estado: EstadoPostulacion; label: string }[] = [
@@ -50,14 +51,18 @@ function Dato({ etiqueta, valor }: { etiqueta: string; valor: string | null }) {
 
 export default function DetalleDrawer({
   post,
+  equipo,
   onClose,
   onMover,
   onGuardarNotas,
+  onAsignar,
 }: {
   post: Postulacion;
+  equipo: TeamMember[];
   onClose: () => void;
   onMover: (estado: EstadoPostulacion) => void;
   onGuardarNotas: (notas: string) => Promise<void>;
+  onAsignar: (assigneeId: number | null) => void;
 }) {
   const o = post.opportunity;
   const [notas, setNotas] = useState(post.notas ?? "");
@@ -142,6 +147,21 @@ export default function DetalleDrawer({
                 </button>
               ))}
             </div>
+          </section>
+
+          {/* Responsable */}
+          <section>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Responsable</p>
+            <select
+              value={post.assignee?.id ?? ""}
+              onChange={(e) => onAsignar(e.target.value ? Number(e.target.value) : null)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:outline-none"
+            >
+              <option value="">Sin asignar</option>
+              {equipo.map((m) => (
+                <option key={m.id} value={m.id}>{m.full_name || m.email}</option>
+              ))}
+            </select>
           </section>
 
           {/* Datos del proceso */}

@@ -40,9 +40,12 @@ class Postulacion(Base):
 
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"))
     opportunity_id: Mapped[int] = mapped_column(ForeignKey("opportunities.id"))
+    # Responsable del equipo asignado a esta oportunidad (opcional).
+    assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     company: Mapped["Company"] = relationship(back_populates="postulaciones")  # noqa: F821
     opportunity: Mapped["Opportunity"] = relationship()  # noqa: F821
+    assignee: Mapped["User | None"] = relationship()  # noqa: F821
     documentos: Mapped[list["Documento"]] = relationship(  # noqa: F821
         back_populates="postulacion", cascade="all, delete-orphan"
     )

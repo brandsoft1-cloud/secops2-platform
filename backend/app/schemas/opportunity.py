@@ -68,9 +68,20 @@ class BuscarResult(BaseModel):
 
 
 # --- Postulacion (CRM) ---
+class AssigneeOut(BaseModel):
+    id: int
+    full_name: str | None
+    email: str
+
+    model_config = {"from_attributes": True}
+
+
 class PostulacionUpdate(BaseModel):
     estado: EstadoPostulacion | None = None
     notas: str | None = None
+    assignee_id: int | None = None
+    # Distingue "no tocar" (campo ausente) de "quitar responsable" (null explícito).
+    set_assignee: bool = False
 
 
 class PostulacionOut(BaseModel):
@@ -78,6 +89,7 @@ class PostulacionOut(BaseModel):
     estado: EstadoPostulacion
     notas: str | None
     updated_at: datetime
+    assignee: AssigneeOut | None = None
     opportunity: OpportunityOut
 
     model_config = {"from_attributes": True}
