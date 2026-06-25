@@ -13,8 +13,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
-      <body className="antialiased">{children}</body>
+    // suppressHydrationWarning: algunas extensiones del navegador (p.ej. QuillBot,
+    // que inyecta data-qb-installed) modifican <html>/<body> antes de que React
+    // hidrate, lo que dispara un falso "hydration mismatch". No afecta a usuarios
+    // sin esas extensiones; esto silencia solo ese ruido en esos dos tags.
+    <html lang="es" suppressHydrationWarning>
+      <body className="antialiased" suppressHydrationWarning>{children}</body>
     </html>
   );
 }

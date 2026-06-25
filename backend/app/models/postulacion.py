@@ -4,7 +4,7 @@ lleva el estado de su gestión: Nueva -> Revisando -> Postulada -> Ganada/Descar
 import enum
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Text, UniqueConstraint
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, JSON, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -29,6 +29,17 @@ class Postulacion(Base):
         Enum(EstadoPostulacion), default=EstadoPostulacion.NUEVA
     )
     notas: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # --- Análisis de IA (se calcula a demanda, no en cada búsqueda) ---
+    # Resumen en lenguaje llano del objeto del proceso.
+    ia_resumen: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Afinidad 0-100 con el perfil de la empresa, con su justificación.
+    ia_afinidad: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ia_motivo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Asistente de postulación: checklist de requisitos y borrador de carta.
+    ia_checklist: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    ia_carta: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

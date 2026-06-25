@@ -16,6 +16,9 @@ class SearchProfile(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120), default="Mi búsqueda")
     sector: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # Códigos UNSPSC del proponente (tomados de su RUP). Señal PRIMARIA de
+    # emparejamiento: precisa y sirve para cualquier sector. Ej.: ["80141600", "90101600"].
+    unspsc_codes: Mapped[list] = mapped_column(JSON, default=list)
     # Lista de palabras clave, p.ej. ["catering", "alimentación", "refrigerios"]
     keywords: Mapped[list] = mapped_column(JSON, default=list)
     # Palabras que DESCARTAN una oportunidad aunque coincidan las keywords.

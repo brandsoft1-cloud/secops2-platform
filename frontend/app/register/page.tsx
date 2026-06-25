@@ -10,6 +10,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState({
     company_name: "",
     full_name: "",
+    phone: "",
     email: "",
     password: "",
     nit: "",
@@ -59,6 +60,16 @@ export default function RegisterPage() {
         <input
           value={form.full_name}
           onChange={update("full_name")}
+          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none"
+        />
+
+        <label className="mt-4 block text-sm font-medium">Celular</label>
+        <input
+          type="tel"
+          inputMode="tel"
+          value={form.phone}
+          onChange={update("phone")}
+          placeholder="Para alertas por WhatsApp/SMS"
           className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none"
         />
 

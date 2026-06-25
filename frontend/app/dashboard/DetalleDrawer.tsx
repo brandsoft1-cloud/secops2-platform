@@ -56,6 +56,8 @@ export default function DetalleDrawer({
   onMover,
   onGuardarNotas,
   onAsignar,
+  onAnalizar,
+  onAsistente,
 }: {
   post: Postulacion;
   equipo: TeamMember[];
@@ -63,6 +65,8 @@ export default function DetalleDrawer({
   onMover: (estado: EstadoPostulacion) => void;
   onGuardarNotas: (notas: string) => Promise<void>;
   onAsignar: (assigneeId: number | null) => void;
+  onAnalizar: () => Promise<void>;
+  onAsistente: () => Promise<void>;
 }) {
   const o = post.opportunity;
   const [notas, setNotas] = useState(post.notas ?? "");
@@ -72,6 +76,39 @@ export default function DetalleDrawer({
   const [subiendo, setSubiendo] = useState(false);
   const [errorDoc, setErrorDoc] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [analizando, setAnalizando] = useState(false);
+  const [asistiendo, setAsistiendo] = useState(false);
+  const [errorIA, setErrorIA] = useState<string | null>(null);
+
+  async function analizar() {
+    setAnalizando(true);
+    setErrorIA(null);
+    try {
+      await onAnalizar();
+    } catch (err) {
+      setErrorIA(err instanceof Error ? err.message : "La IA no está disponible");
+    } finally {
+      setAnalizando(false);
+    }
+  }
+
+  async function asistir() {
+    setAsistiendo(true);
+    setErrorIA(null);
+    try {
+      await onAsistente();
+    } catch (err) {
+      setErrorIA(err instanceof Error ? err.message : "La IA no está disponible");
+    } finally {
+      setAsistiendo(false);
+    }
+  }
+
+  function colorAfinidad(n: number) {
+    if (n >= 70) return "bg-green-100 text-green-700";
+    if (n >= 40) return "bg-amber-100 text-amber-700";
+    return "bg-gray-100 text-gray-600";
+  }
 
   // Solo al cambiar de postulación (no al guardar, que actualiza post.notas).
   useEffect(() => {
@@ -117,9 +154,9 @@ export default function DetalleDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <aside className="relative z-10 h-full w-full max-w-md overflow-y-auto bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <aside className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
         <header className="flex items-start justify-between border-b border-gray-200 p-5">
           <div>
             <p className="text-xs font-medium text-gray-500">{o.entidad ?? "Entidad"}</p>
@@ -162,6 +199,71 @@ export default function DetalleDrawer({
                 <option key={m.id} value={m.id}>{m.full_name || m.email}</option>
               ))}
             </select>
+          </section>
+
+          {/* Análisis con IA */}
+          <section className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">✨ Análisis con IA</p>
+              {post.ia_afinidad != null && (
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${colorAfinidad(post.ia_afinidad)}`}>
+                  Afinidad {post.ia_afinidad}/100
+                </span>
+              )}
+            </div>
+
+            {post.ia_resumen ? (
+              <div className="mt-2 space-y-1">
+                <p className="text-sm text-gray-700">{post.ia_resumen}</p>
+                {post.ia_motivo && <p className="text-xs text-gray-500">¿Por qué? {post.ia_motivo}</p>}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-gray-600">
+                Pide un resumen en lenguaje llano y un puntaje de qué tan bien encaja con tu perfil.
+              </p>
+            )}
+
+            <button
+              onClick={analizar}
+              disabled={analizando}
+              className="mt-3 rounded-lg border border-brand px-3 py-1.5 text-sm text-brand hover:bg-teal-50 disabled:opacity-50"
+            >
+              {analizando ? "Analizando…" : post.ia_resumen ? "Volver a analizar" : "Analizar con IA"}
+            </button>
+
+            {/* Asistente: checklist + carta */}
+            {post.ia_checklist && post.ia_checklist.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-gray-600">Checklist de requisitos</p>
+                <ul className="mt-1 space-y-1">
+                  {post.ia_checklist.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                      <span className="text-gray-300">☐</span> {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {post.ia_carta && (
+              <div className="mt-3">
+                <p className="text-xs font-medium text-gray-600">Borrador de carta de presentación</p>
+                <textarea
+                  readOnly
+                  value={post.ia_carta}
+                  rows={6}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700"
+                />
+              </div>
+            )}
+            <button
+              onClick={asistir}
+              disabled={asistiendo}
+              className="mt-3 ml-0 rounded-lg border border-brand px-3 py-1.5 text-sm text-brand hover:bg-teal-50 disabled:opacity-50"
+            >
+              {asistiendo ? "Generando…" : post.ia_carta ? "Regenerar checklist y carta" : "Generar checklist y carta"}
+            </button>
+
+            {errorIA && <p className="mt-2 text-xs text-red-500">{errorIA}</p>}
           </section>
 
           {/* Datos del proceso */}

@@ -10,6 +10,7 @@ import {
   getMe,
   getToken,
   listTeam,
+  updateCompanySettings,
   type Me,
   type Rol,
   type TeamMember,
@@ -23,12 +24,29 @@ export default function EquipoPage() {
   const [form, setForm] = useState({ full_name: "", email: "", password: "", role: "miembro" as Rol });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [chatId, setChatId] = useState("");
+  const [guardandoTg, setGuardandoTg] = useState(false);
+  const [tgGuardado, setTgGuardado] = useState(false);
 
   async function cargar() {
     const [meData, miembros] = await Promise.all([getMe(), listTeam()]);
     setMe(meData);
     setTeam(miembros);
+    setChatId(meData.company.telegram_chat_id ?? "");
     setLoading(false);
+  }
+
+  async function guardarTelegram(e: React.FormEvent) {
+    e.preventDefault();
+    setGuardandoTg(true);
+    setTgGuardado(false);
+    try {
+      const company = await updateCompanySettings({ telegram_chat_id: chatId.trim() || null });
+      setChatId(company.telegram_chat_id ?? "");
+      setTgGuardado(true);
+    } finally {
+      setGuardandoTg(false);
+    }
   }
 
   useEffect(() => {
@@ -158,6 +176,37 @@ export default function EquipoPage() {
               >
                 {guardando ? "Agregando…" : "Agregar al equipo"}
               </button>
+            </form>
+          </section>
+        )}
+
+        {esAdmin && (
+          <section className="mt-6">
+            <form onSubmit={guardarTelegram} className="space-y-3 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-semibold text-gray-700">Alertas por Telegram</h2>
+              <p className="text-xs text-gray-500">
+                Recibe las nuevas oportunidades al instante. Escríbele a tu bot en Telegram,
+                obtén tu <span className="font-medium">chat ID</span> y pégalo aquí. Déjalo vacío para desactivar.
+              </p>
+              <div>
+                <label className="block text-sm font-medium">Chat ID de Telegram</label>
+                <input
+                  value={chatId}
+                  onChange={(e) => { setChatId(e.target.value); setTgGuardado(false); }}
+                  placeholder="p. ej. 123456789"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-brand focus:outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={guardandoTg}
+                  className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50"
+                >
+                  {guardandoTg ? "Guardando…" : "Guardar"}
+                </button>
+                {tgGuardado && <span className="text-sm text-green-600">✓ Guardado</span>}
+              </div>
             </form>
           </section>
         )}

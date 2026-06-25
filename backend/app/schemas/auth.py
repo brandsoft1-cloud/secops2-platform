@@ -11,6 +11,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
     full_name: str | None = None
+    phone: str | None = None
     company_name: str
     nit: str | None = None
 
@@ -32,8 +33,14 @@ class CompanyOut(BaseModel):
     plan: Plan
     trial_ends_at: datetime
     last_searched_at: datetime | None = None
+    telegram_chat_id: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class CompanySettingsUpdate(BaseModel):
+    # null o "" para desconectar Telegram.
+    telegram_chat_id: str | None = None
 
 
 class UserOut(BaseModel):

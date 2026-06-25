@@ -29,6 +29,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)) -> Token:
         email=data.email,
         hashed_password=hash_password(data.password),
         full_name=data.full_name,
+        phone=data.phone,
         role=UserRole.ADMIN,
         company_id=company.id,
     )

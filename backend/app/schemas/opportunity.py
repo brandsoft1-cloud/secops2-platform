@@ -11,6 +11,8 @@ from app.models.postulacion import EstadoPostulacion
 class SearchProfileBase(BaseModel):
     name: str = "Mi búsqueda"
     sector: str | None = None
+    # Códigos UNSPSC del proponente (de su RUP). Señal primaria de matching.
+    unspsc_codes: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
     exclude_keywords: list[str] = Field(default_factory=list)
     ciudad: str | None = None
@@ -43,11 +45,33 @@ class OpportunityOut(BaseModel):
     estado_secop: str | None
     modalidad: str | None
     tipo_contrato: str | None
+    unspsc_codes: list[str] = Field(default_factory=list)
     fecha_publicacion: datetime | None
     fecha_cierre: datetime | None
     url: str | None
 
     model_config = {"from_attributes": True}
+
+
+class SeguirRequest(BaseModel):
+    secop_id: str
+
+
+# Proceso del explorador (viene directo de SECOP, sin estado/CRM ni id propio).
+class ExploreOut(BaseModel):
+    secop_id: str
+    entidad: str | None = None
+    objeto: str | None = None
+    valor: float | None = None
+    ciudad: str | None = None
+    departamento: str | None = None
+    estado_secop: str | None = None
+    modalidad: str | None = None
+    tipo_contrato: str | None = None
+    unspsc_codes: list[str] = Field(default_factory=list)
+    fecha_publicacion: datetime | None = None
+    fecha_cierre: datetime | None = None
+    url: str | None = None
 
 
 # --- Documentos ---
@@ -90,6 +114,12 @@ class PostulacionOut(BaseModel):
     notas: str | None
     updated_at: datetime
     assignee: AssigneeOut | None = None
+    # Análisis de IA (None hasta que se solicita).
+    ia_resumen: str | None = None
+    ia_afinidad: int | None = None
+    ia_motivo: str | None = None
+    ia_checklist: list[str] | None = None
+    ia_carta: str | None = None
     opportunity: OpportunityOut
 
     model_config = {"from_attributes": True}
