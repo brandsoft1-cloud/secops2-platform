@@ -9,10 +9,12 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import func, or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.models.opportunity import Opportunity
+from app.models.search_profile import SearchProfile
 from app.services import secop
 
 logger = logging.getLogger("mirror")
@@ -31,9 +33,6 @@ def ingestar(
     Hace upsert por secop_id (no duplica). Devuelve cuántos NUEVOS guardó.
     """
     nuevos = 0
-    existentes = {
-        r[0] for r in db.execute(select(Opportunity.secop_id)).all()
-    }
     for pagina in range(max_paginas):
         filas = secop.fetch_pagina(
             offset=pagina * page_size,
@@ -44,18 +43,34 @@ def ingestar(
         )
         if not filas:
             break
-        for datos in filas:
-            sid = datos["secop_id"]
-            if sid in existentes:
-                continue
-            existentes.add(sid)
-            db.add(Opportunity(**datos))
-            nuevos += 1
+        # Dedup por secop_id dentro de la tanda (SECOP repite filas por proceso),
+        # luego upsert escalable con ON CONFLICT DO NOTHING (no carga todo en RAM).
+        unicos = list({f["secop_id"]: f for f in filas}.values())
+        stmt = (
+            pg_insert(Opportunity)
+            .values(unicos)
+            .on_conflict_do_nothing(index_elements=["secop_id"])
+            .returning(Opportunity.id)
+        )
+        nuevos += len(db.execute(stmt).fetchall())
         db.commit()
         logger.info("Espejo %s: página %d (+%d nuevos acumulados)", departamento or "global", pagina, nuevos)
         if len(filas) < page_size:
             break
     return nuevos
+
+
+def refrescar_global(db: Session, *, dias: int = 30) -> dict:
+    """Refresca el espejo para todas las zonas con perfiles activos (lo usa el worker)."""
+    deptos = {
+        p.departamento
+        for p in db.scalars(select(SearchProfile).where(SearchProfile.active.is_(True))).all()
+        if p.departamento
+    }
+    nuevos = 0
+    for depto in deptos:
+        nuevos += ingestar(db, departamento=depto, dias=dias)
+    return {"departamentos": sorted(deptos), "nuevos": nuevos}
 
 
 def _filtrar(
@@ -81,15 +96,11 @@ def _filtrar(
         stmt = stmt.where(Opportunity.modalidad.in_(modalidades))
 
     # Inclusión por OR: alguna keyword en el objeto, o alguna clase UNSPSC (6 díg).
+    # El overlap (&&) sobre el array unspsc_clases usa índice GIN (rápido).
     incl = [Opportunity.objeto.ilike(f"%{kw}%") for kw in (keywords or [])]
     clases = sorted({str(c)[:6] for c in (unspsc or []) if str(c)[:6]})
     if clases:
-        incl.append(
-            text(
-                "EXISTS (SELECT 1 FROM json_array_elements_text(opportunities.unspsc_codes) AS c "
-                "WHERE left(c, 6) = ANY(:clases))"
-            ).bindparams(clases=clases)
-        )
+        incl.append(Opportunity.unspsc_clases.overlap(clases))
     if incl:
         stmt = stmt.where(or_(*incl))
 

@@ -169,9 +169,25 @@ def main() -> None:
         logger.info("Rastreador en bucle cada %d s. Ctrl+C para salir.", settings.secop_poll_seconds)
         while True:
             ejecutar_pasada(limit=args.limit)
+            _refrescar_espejo()
             time.sleep(settings.secop_poll_seconds)
     else:
         ejecutar_pasada(limit=args.limit)
+        _refrescar_espejo()
+
+
+def _refrescar_espejo() -> None:
+    """Actualiza el espejo local para las zonas con perfiles activos."""
+    from app.services import mirror
+
+    db = SessionLocal()
+    try:
+        res = mirror.refrescar_global(db, dias=settings.secop_dias_recientes)
+        logger.info("Espejo refrescado: %s", res)
+    except Exception:
+        logger.exception("Error refrescando el espejo")
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

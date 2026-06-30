@@ -6,6 +6,7 @@ Postulacion para llevar su propio estado en el CRM.
 from datetime import datetime, timezone
 
 from sqlalchemy import String, DateTime, Numeric, Text, JSON
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -28,6 +29,9 @@ class Opportunity(Base):
     # Códigos UNSPSC del proceso (de codigo_principal_de_categoria + adicionales),
     # normalizados a 8 dígitos. Ej.: ["80111604", "90101600"].
     unspsc_codes: Mapped[list] = mapped_column(JSON, default=list)
+    # Clases UNSPSC (primeros 6 díg) como array, para matching rápido con índice
+    # GIN (overlap &&). Derivado de unspsc_codes. Ej.: ["801116", "901016"].
+    unspsc_clases: Mapped[list] = mapped_column(ARRAY(String), default=list)
     fecha_publicacion: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     fecha_cierre: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     url: Mapped[str | None] = mapped_column(Text, nullable=True)
