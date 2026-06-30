@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
+from app import plans
 from app.api.deps import get_current_user
 from app.database import get_db
 from app.models.company import Company
@@ -219,6 +220,8 @@ def analizar(
     db: Session = Depends(get_db),
 ):
     """Resume la oportunidad con IA y puntúa su afinidad con el perfil de la empresa."""
+    company = db.get(Company, current.company_id)
+    plans.verificar_cupo_ia(company)
     post = _get_postulacion(postulacion_id, current, db)
     perfil = db.scalar(
         select(SearchProfile)
@@ -231,7 +234,7 @@ def analizar(
     post.ia_resumen = analisis.resumen
     post.ia_afinidad = analisis.afinidad
     post.ia_motivo = analisis.motivo
-    db.commit()
+    plans.registrar_uso_ia(company, db)  # cuenta el consumo y hace commit
     db.refresh(post)
     return post
 
@@ -243,13 +246,14 @@ def asistente(
     db: Session = Depends(get_db),
 ):
     """Genera un checklist de requisitos y un borrador de carta de presentación con IA."""
-    post = _get_postulacion(postulacion_id, current, db)
     company = db.get(Company, current.company_id)
+    plans.verificar_cupo_ia(company)
+    post = _get_postulacion(postulacion_id, current, db)
     resultado = ia.generar_asistente(post.opportunity, company.name if company else "la empresa")
     if resultado is None:
         raise HTTPException(status_code=503, detail="El asistente con IA no está disponible")
     post.ia_checklist = resultado.checklist
     post.ia_carta = resultado.carta
-    db.commit()
+    plans.registrar_uso_ia(company, db)  # cuenta el consumo y hace commit
     db.refresh(post)
     return post

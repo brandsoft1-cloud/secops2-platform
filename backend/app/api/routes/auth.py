@@ -55,3 +55,11 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
 @router.get("/me", response_model=UserOut)
 def me(current: User = Depends(get_current_user)) -> User:
     return current
+
+
+@router.get("/plan")
+def plan(current: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Plan vigente, límites y consumo (para mostrar topes y avisos de upgrade)."""
+    from app import plans
+
+    return plans.estado_plan(db.get(Company, current.company_id), db)

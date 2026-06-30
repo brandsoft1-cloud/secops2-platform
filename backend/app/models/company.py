@@ -31,6 +31,10 @@ class Company(Base):
     last_searched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Chat de Telegram donde la empresa recibe alertas instantáneas (opcional).
     telegram_chat_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # Consumo de IA del mes en curso (para el límite por plan). Se reinicia al
+    # cambiar de periodo (YYYY-MM).
+    ia_uso_mes: Mapped[int] = mapped_column(default=0)
+    ia_uso_periodo: Mapped[str | None] = mapped_column(String(7), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

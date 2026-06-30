@@ -3,8 +3,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import plans
 from app.api.deps import get_current_user
 from app.database import get_db
+from app.models.company import Company
 from app.models.search_profile import SearchProfile
 from app.models.user import User
 from app.schemas.opportunity import SearchProfileCreate, SearchProfileOut
@@ -25,6 +27,7 @@ def crear(
     current: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    plans.exigir_cupo_perfil(db.get(Company, current.company_id), db)
     profile = SearchProfile(**data.model_dump(), company_id=current.company_id)
     db.add(profile)
     db.commit()

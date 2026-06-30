@@ -43,6 +43,8 @@ def crear(
     db: Session = Depends(get_db),
 ):
     """El admin crea un usuario de su empresa con una contraseña inicial."""
+    from app import plans
+    plans.exigir_cupo_usuario(db.get(Company, admin.company_id), db)
     if db.scalar(select(User).where(User.email == data.email)):
         raise HTTPException(status_code=400, detail="Ese correo ya está registrado")
     user = User(
