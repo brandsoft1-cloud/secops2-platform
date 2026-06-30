@@ -57,6 +57,7 @@ export interface RegisterPayload {
   email: string;
   password: string;
   full_name?: string;
+  phone?: string;
   company_name: string;
   nit?: string;
 }
@@ -70,16 +71,20 @@ export async function register(payload: RegisterPayload): Promise<string> {
   return data.access_token;
 }
 
+export type Rol = "admin" | "miembro";
+
 export interface Me {
   id: number;
   email: string;
   full_name: string | null;
+  role: Rol;
   company: {
     id: number;
     name: string;
     plan: string;
     trial_ends_at: string;
     last_searched_at: string | null;
+    telegram_chat_id: string | null;
   };
 }
 
@@ -118,22 +123,118 @@ export interface Opportunity {
   url: string | null;
 }
 
+export interface Assignee {
+  id: number;
+  full_name: string | null;
+  email: string;
+}
+
 export interface Postulacion {
   id: number;
   estado: EstadoPostulacion;
   notas: string | null;
   updated_at: string;
+  assignee: Assignee | null;
+  // Análisis de IA (null hasta que se solicita).
+  ia_resumen: string | null;
+  ia_afinidad: number | null;
+  ia_motivo: string | null;
+  ia_checklist: string[] | null;
+  ia_carta: string | null;
   opportunity: Opportunity;
 }
 
-export const listOpportunities = (estado?: EstadoPostulacion) =>
-  request<Postulacion[]>(`/api/opportunities${estado ? `?estado=${estado}` : ""}`);
+export const listOpportunities = (estado?: EstadoPostulacion, profileId?: number) => {
+  const qs = new URLSearchParams();
+  if (estado) qs.set("estado", estado);
+  if (profileId != null) qs.set("profile_id", String(profileId));
+  const q = qs.toString();
+  return request<Postulacion[]>(`/api/opportunities${q ? `?${q}` : ""}`);
+};
+
+// Explorador: TODO SECOP II (abierto reciente), paginado de N en N. Son procesos
+// crudos (sin estado/CRM ni id propio), para navegar sin filtro de empresa.
+export interface ExploreItem {
+  secop_id: string;
+  entidad: string | null;
+  objeto: string | null;
+  valor: number | null;
+  ciudad: string | null;
+  departamento: string | null;
+  estado_secop: string | null;
+  modalidad: string | null;
+  tipo_contrato: string | null;
+  unspsc_codes: string[];
+  fecha_publicacion: string | null;
+  fecha_cierre: string | null;
+  url: string | null;
+}
+
+export const explorarSecop = (offset: number, limit = 10, profileId?: number, dias = 30) => {
+  const qs = new URLSearchParams({ offset: String(offset), limit: String(limit), dias: String(dias) });
+  if (profileId != null) qs.set("profile_id", String(profileId));
+  return request<ExploreItem[]>(`/api/opportunities/explorar?${qs}`);
+};
+
+export const explorarTotal = (profileId?: number, dias = 30) => {
+  const qs = new URLSearchParams({ dias: String(dias) });
+  if (profileId != null) qs.set("profile_id", String(profileId));
+  return request<{ total: number }>(`/api/opportunities/explorar/total?${qs}`);
+};
+
+// Sigue un proceso del explorador: lo agrega al panel (crea la postulación).
+export const seguirProceso = (secopId: string) =>
+  request<Postulacion>("/api/opportunities/seguir", {
+    method: "POST",
+    body: JSON.stringify({ secop_id: secopId }),
+  });
 
 export const updatePostulacion = (
   id: number,
-  data: { estado?: EstadoPostulacion; notas?: string }
+  data: {
+    estado?: EstadoPostulacion;
+    notas?: string;
+    assignee_id?: number | null;
+    set_assignee?: boolean;
+  }
 ) =>
   request<Postulacion>(`/api/opportunities/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+
+// IA: resume la oportunidad y puntúa su afinidad con el perfil.
+export const analizarPostulacion = (id: number) =>
+  request<Postulacion>(`/api/opportunities/${id}/analizar`, { method: "POST" });
+
+// IA: genera checklist de requisitos y borrador de carta de presentación.
+export const asistentePostulacion = (id: number) =>
+  request<Postulacion>(`/api/opportunities/${id}/asistente`, { method: "POST" });
+
+// --- Equipo (multiusuario) ---
+export interface TeamMember {
+  id: number;
+  email: string;
+  full_name: string | null;
+  role: Rol;
+  is_active: boolean;
+}
+
+export const listTeam = () => request<TeamMember[]>("/api/team");
+
+export const createTeamMember = (data: {
+  email: string;
+  password: string;
+  full_name?: string;
+  role: Rol;
+}) => request<TeamMember>("/api/team", { method: "POST", body: JSON.stringify(data) });
+
+export const deleteTeamMember = (id: number) =>
+  request<void>(`/api/team/${id}`, { method: "DELETE" });
+
+// Ajustes de empresa (solo admin). Por ahora, el chat de Telegram para alertas.
+export const updateCompanySettings = (data: { telegram_chat_id: string | null }) =>
+  request<Me["company"]>("/api/team/empresa", {
     method: "PATCH",
     body: JSON.stringify(data),
   });
@@ -143,8 +244,10 @@ export interface SearchProfile {
   id: number;
   name: string;
   sector: string | null;
+  unspsc_codes: string[];
   keywords: string[];
   exclude_keywords: string[];
+  modalidades: string[];
   ciudad: string | null;
   departamento: string | null;
   presupuesto_min: number | null;

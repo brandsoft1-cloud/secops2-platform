@@ -29,6 +29,8 @@ class Company(Base):
     trial_ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_trial_end)
     # Última vez que el rastreador buscó oportunidades para esta empresa.
     last_searched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Chat de Telegram donde la empresa recibe alertas instantáneas (opcional).
+    telegram_chat_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

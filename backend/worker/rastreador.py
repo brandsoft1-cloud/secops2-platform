@@ -30,7 +30,7 @@ from app.models.postulacion import Postulacion
 from app.models.search_profile import SearchProfile
 from app.services import secop
 from app.services.matching import coincide, esta_vigente
-from app.services.notificaciones import alertar_oportunidades
+from app.services.notificaciones import alertar_oportunidades, alertar_telegram
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("rastreador")
@@ -136,6 +136,8 @@ def ejecutar_pasada(limit: int | None = 1000, company_id: int | None = None) -> 
                 continue
             destinatario = company.users[0].email
             alertar_oportunidades(destinatario, company.name, oportunidades)
+            if company.telegram_chat_id:
+                alertar_telegram(company.telegram_chat_id, company.name, oportunidades)
             logger.info("Alertadas %d oportunidades a %s", len(oportunidades), company.name)
 
         return sum(len(v) for v in nuevas_por_empresa.values())

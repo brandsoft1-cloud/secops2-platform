@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.database import get_db
-from app.models.user import User
+from app.models.user import User, UserRole
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
@@ -27,3 +27,13 @@ def get_current_user(
     if user is None or not user.is_active:
         raise credenciales_invalidas
     return user
+
+
+def require_admin(current: User = Depends(get_current_user)) -> User:
+    """Solo administradores de la empresa."""
+    if current.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo un administrador puede hacer esto.",
+        )
+    return current

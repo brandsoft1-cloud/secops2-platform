@@ -16,11 +16,16 @@ class SearchProfile(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120), default="Mi búsqueda")
     sector: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # Códigos UNSPSC del proponente (tomados de su RUP). Señal PRIMARIA de
+    # emparejamiento: precisa y sirve para cualquier sector. Ej.: ["80141600", "90101600"].
+    unspsc_codes: Mapped[list] = mapped_column(JSON, default=list)
     # Lista de palabras clave, p.ej. ["catering", "alimentación", "refrigerios"]
     keywords: Mapped[list] = mapped_column(JSON, default=list)
     # Palabras que DESCARTAN una oportunidad aunque coincidan las keywords.
     # Ej.: "animal", "veterinario" para que "alimentación animal" no entre.
     exclude_keywords: Mapped[list] = mapped_column(JSON, default=list)
+    # Modalidades de contratación a incluir (vacío = todas). Ej.: ["Mínima cuantía"].
+    modalidades: Mapped[list] = mapped_column(JSON, default=list)
     # Alcance geográfico. Si se fija departamento, el radar busca en todo el
     # departamento; ciudad lo acota aún más. Cada uno filtra solo si está puesto.
     ciudad: Mapped[str | None] = mapped_column(String(120), nullable=True)

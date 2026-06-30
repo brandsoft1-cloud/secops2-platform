@@ -47,6 +47,21 @@ class Settings(BaseSettings):
     whatsapp_api_url: str = ""
     whatsapp_api_token: str = ""
 
+    # Telegram (alertas instantáneas). El token lo da @BotFather; cada empresa
+    # guarda su chat_id. Si no hay token, las alertas se registran en consola.
+    telegram_bot_token: str = ""
+
+    # IA (vía OpenRouter, API compatible con OpenAI): resume oportunidades,
+    # puntúa afinidad y genera checklist/carta. Sin api_key, las funciones de IA
+    # se desactivan con gracia. OpenRouter da acceso a muchos modelos con una
+    # sola key; el slug exacto se consulta en https://openrouter.ai/models.
+    openrouter_api_key: str = ""
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    # Modelo por defecto. Calidad: anthropic/claude-haiku-4.5; económico: deepseek/deepseek-chat.
+    openrouter_model: str = "anthropic/claude-haiku-4.5"
+    # OpenRouter recomienda identificar la app (aparece en su panel). Opcional.
+    openrouter_app_name: str = "Radar de Licitaciones"
+
 
 @lru_cache
 def get_settings() -> Settings:

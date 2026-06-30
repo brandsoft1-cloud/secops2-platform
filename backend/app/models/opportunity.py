@@ -25,6 +25,9 @@ class Opportunity(Base):
     estado_secop: Mapped[str | None] = mapped_column(String(120), nullable=True)
     modalidad: Mapped[str | None] = mapped_column(String(200), nullable=True)
     tipo_contrato: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Códigos UNSPSC del proceso (de codigo_principal_de_categoria + adicionales),
+    # normalizados a 8 dígitos. Ej.: ["80111604", "90101600"].
+    unspsc_codes: Mapped[list] = mapped_column(JSON, default=list)
     fecha_publicacion: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     fecha_cierre: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     url: Mapped[str | None] = mapped_column(Text, nullable=True)

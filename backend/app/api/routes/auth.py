@@ -8,7 +8,7 @@ from app.api.deps import get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.database import get_db
 from app.models.company import Company
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.auth import RegisterRequest, Token, UserOut
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -24,10 +24,13 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)) -> Token:
     db.add(company)
     db.flush()  # para obtener company.id
 
+    # Quien registra la empresa es su administrador.
     user = User(
         email=data.email,
         hashed_password=hash_password(data.password),
         full_name=data.full_name,
+        phone=data.phone,
+        role=UserRole.ADMIN,
         company_id=company.id,
     )
     db.add(user)

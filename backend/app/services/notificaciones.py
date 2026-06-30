@@ -65,6 +65,40 @@ def alertar_oportunidades(destinatario: str, empresa: str, oportunidades: list[O
     enviar_email(destinatario, asunto, cuerpo)
 
 
+def enviar_telegram(chat_id: str, mensaje: str) -> None:
+    """Envía un mensaje por Telegram usando el bot de la plataforma.
+
+    Si no hay token configurado, registra en consola en vez de enviar.
+    """
+    if not settings.telegram_bot_token:
+        logger.info("[Telegram no configurado] a %s: %s", chat_id, mensaje)
+        return
+    url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage"
+    try:
+        resp = httpx.post(
+            url,
+            json={"chat_id": chat_id, "text": mensaje, "disable_web_page_preview": True},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        logger.info("Telegram enviado a %s", chat_id)
+    except httpx.HTTPError:
+        logger.exception("No se pudo enviar Telegram a %s", chat_id)
+
+
+def alertar_telegram(chat_id: str, empresa: str, oportunidades: list[Opportunity]) -> None:
+    """Notifica por Telegram sobre nuevos procesos que coinciden con el perfil."""
+    if not oportunidades:
+        return
+    n = len(oportunidades)
+    mensaje = (
+        f"🎯 {n} nueva(s) oportunidad(es) para {empresa}:\n\n"
+        f"{_formato_oportunidades(oportunidades)}\n\n"
+        "Entra a tu panel para gestionarlas."
+    )
+    enviar_telegram(chat_id, mensaje)
+
+
 def enviar_whatsapp(telefono: str, mensaje: str) -> None:
     """Fase 2. Placeholder de integración con una API de WhatsApp."""
     if not settings.whatsapp_api_url:

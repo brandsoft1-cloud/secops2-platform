@@ -17,8 +17,26 @@ def _normaliza_texto(texto: str | None) -> str:
     return sin_tildes.lower()
 
 
+def _clases(codigos: list[str] | None) -> set[str]:
+    """Clases UNSPSC (primeros 6 dígitos) de una lista de códigos.
+
+    Se empareja por clase, no por código exacto de 8 dígitos: las entidades
+    clasifican de forma irregular. Pero NO por familia (4 dígitos): familias
+    como 8011 (servicios) son enormes y mezclan rubros muy distintos.
+    """
+    return {str(c)[:6] for c in (codigos or []) if c and len(str(c)) >= 6}
+
+
 def coincide(opp: Opportunity, profile: SearchProfile) -> bool:
-    """True si la oportunidad cumple los criterios del perfil de búsqueda."""
+    """True si la oportunidad cumple los criterios del perfil de búsqueda.
+
+    Inclusión por OR de señales (probado con datos reales: el UNSPSC de SECOP es
+    demasiado inconsistente para usarlo como filtro duro — el mismo servicio cae
+    en muchas clases y muchos procesos vienen sin código). Por eso:
+      - basta que coincida UNA señal declarada: palabra clave en el objeto, o
+        clase UNSPSC (6 dígitos). Maximiza recall; las exclusiones podan el ruido.
+    Si el perfil no declara ninguna señal, solo aplican geografía y presupuesto.
+    """
     if not profile.active:
         return False
 
@@ -30,6 +48,11 @@ def coincide(opp: Opportunity, profile: SearchProfile) -> bool:
         if _normaliza_texto(profile.ciudad) not in _normaliza_texto(opp.ciudad):
             return False
 
+    # Modalidades (vacío = todas).
+    if getattr(profile, "modalidades", None):
+        if opp.modalidad not in profile.modalidades:
+            return False
+
     # Presupuesto
     if opp.valor is not None:
         if profile.presupuesto_min is not None and opp.valor < float(profile.presupuesto_min):
@@ -39,10 +62,14 @@ def coincide(opp: Opportunity, profile: SearchProfile) -> bool:
 
     texto = _normaliza_texto(" ".join(filter(None, [opp.objeto, opp.entidad, opp.estado_secop])))
 
-    # Palabras clave: al menos una debe aparecer en entidad/objeto/sector
+    # Inclusión por OR de las señales declaradas (UNSPSC clase y/o palabras clave).
+    senales: list[bool] = []
+    if profile.unspsc_codes:
+        senales.append(bool(_clases(profile.unspsc_codes) & _clases(opp.unspsc_codes)))
     if profile.keywords:
-        if not any(_normaliza_texto(kw) in texto for kw in profile.keywords):
-            return False
+        senales.append(any(_normaliza_texto(kw) in texto for kw in profile.keywords))
+    if senales and not any(senales):
+        return False
 
     # Exclusiones: si aparece cualquier palabra vetada, se descarta.
     if profile.exclude_keywords:
