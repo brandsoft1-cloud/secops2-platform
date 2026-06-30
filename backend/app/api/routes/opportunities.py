@@ -74,30 +74,52 @@ def listar(
     return posts
 
 
+def _filtros_explorar(profile_id, dias, current, db) -> dict:
+    """Arma los filtros de SECOP según el rango (días) y, si aplica, el perfil."""
+    filtros: dict = {
+        "estados": settings.secop_estados_abiertos,
+        "desde_dias": dias,
+    }
+    if profile_id is not None:
+        perfil = db.get(SearchProfile, profile_id)
+        if not perfil or perfil.company_id != current.company_id:
+            raise HTTPException(status_code=404, detail="Perfil no encontrado")
+        filtros.update(
+            departamento=perfil.departamento,
+            ciudad=perfil.ciudad,
+            keywords=perfil.keywords,
+            exclude=perfil.exclude_keywords,
+            unspsc=perfil.unspsc_codes,
+        )
+    return filtros
+
+
 @router.get("/explorar", response_model=list[ExploreOut])
 def explorar(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=50),
+    profile_id: int | None = Query(default=None),
+    dias: int = Query(default=30, ge=1, le=1825),
     current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """Explorador: TODO SECOP II (procesos abiertos recientes), sin filtro de
-    empresa, paginado de N en N para el scroll infinito de "Todas las oportunidades".
+    """Explorador (consulta en vivo a SECOP II, paginada de N en N).
+
+    `dias` define el rango hacia atrás (30, 180, 365, 730…). Con profile_id,
+    además filtra por los criterios del perfil (zona + keywords/UNSPSC + exclusiones).
     """
-    return secop.fetch_pagina(
-        offset=offset,
-        limit=limit,
-        estados=settings.secop_estados_abiertos,
-        desde_dias=settings.secop_dias_recientes,
-    )
+    return secop.fetch_pagina(offset=offset, limit=limit, **_filtros_explorar(profile_id, dias, current, db))
 
 
 @router.get("/explorar/total")
-def explorar_total(current: User = Depends(get_current_user)):
-    """Total de procesos activos en SECOP II (para el contador "Encontrados: N")."""
-    return {"total": secop.contar(
-        estados=settings.secop_estados_abiertos,
-        desde_dias=settings.secop_dias_recientes,
-    )}
+def explorar_total(
+    profile_id: int | None = Query(default=None),
+    dias: int = Query(default=30, ge=1, le=1825),
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Total que cumple el filtro/rango (para el contador "Encontrados: N")."""
+    return {"total": secop.contar(**_filtros_explorar(profile_id, dias, current, db))}
 
 
 @router.post("/seguir", response_model=PostulacionOut)

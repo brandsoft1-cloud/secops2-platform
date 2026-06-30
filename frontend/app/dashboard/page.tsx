@@ -39,6 +39,13 @@ const ESTADO_META: Record<EstadoPostulacion, { label: string; clase: string }> =
   descartada: { label: "Descartada", clase: "bg-gray-100 text-gray-500" },
 };
 const PASO = 10;
+const RANGOS = [
+  { d: 30, label: "Último mes" },
+  { d: 90, label: "3 meses" },
+  { d: 180, label: "6 meses" },
+  { d: 365, label: "1 año" },
+  { d: 730, label: "2 años" },
+];
 
 function formatoCOP(v: number | null) {
   if (v == null) return "Sin valor";
@@ -50,10 +57,9 @@ function fechaHora(iso: string | null) {
 function ubicacion(o: { ciudad: string | null; departamento: string | null }) {
   return [o.ciudad, o.departamento].filter(Boolean).join(", ") || "—";
 }
-
-function Campo({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
+function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className={`rounded-lg bg-gray-50 p-3 ${className}`}>
+    <div className="rounded-lg bg-gray-50 p-3">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
       <div className="mt-0.5 text-sm">{children}</div>
     </div>
@@ -71,28 +77,42 @@ export default function Dashboard() {
   const [buscando, setBuscando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [vista, setVista] = useState<Vista>("explorar");
+  const [dias, setDias] = useState(30);
   const [visibles, setVisibles] = useState(PASO);
   const [seguidos, setSeguidos] = useState<Set<string>>(new Set());
   const [siguiendo, setSiguiendo] = useState<string | null>(null);
 
-  // Explorador
+  // Explorador en vivo (modo "Todas" y modo perfil)
   const [explorar, setExplorar] = useState<ExploreItem[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [hayMasEx, setHayMasEx] = useState(true);
   const offsetRef = useRef(0);
   const cargandoRef = useRef(false);
   const hayMasRef = useRef(true);
+  const profileIdRef = useRef<number | undefined>(undefined);
+  const diasRef = useRef(30);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   async function cargarMasEx() {
     if (cargandoRef.current || !hayMasRef.current) return;
     cargandoRef.current = true;
     try {
-      const batch = await explorarSecop(offsetRef.current, PASO);
-      setExplorar((prev) => [...prev, ...batch]);
+      const batch = await explorarSecop(offsetRef.current, PASO, profileIdRef.current, diasRef.current);
+      setExplorar((prev) => {
+        const vistos = new Set(prev.map((p) => p.secop_id));
+        const nuevos: ExploreItem[] = [];
+        for (const b of batch) if (!vistos.has(b.secop_id)) { vistos.add(b.secop_id); nuevos.push(b); }
+        return [...prev, ...nuevos];
+      });
       offsetRef.current += batch.length;
       hayMasRef.current = batch.length === PASO;
       setHayMasEx(hayMasRef.current);
+      setAviso(null);
+    } catch {
+      // Detener el scroll ante fallo de red (si no, el observador reintenta sin parar).
+      hayMasRef.current = false;
+      setHayMasEx(false);
+      setAviso("No se pudo cargar más (red). Recarga para reintentar.");
     } finally {
       cargandoRef.current = false;
     }
@@ -100,13 +120,10 @@ export default function Dashboard() {
   function reiniciarExplorar() {
     offsetRef.current = 0; hayMasRef.current = true; cargandoRef.current = false;
     setExplorar([]); setHayMasEx(true); cargarMasEx();
-    if (total === null) explorarTotal().then((t) => setTotal(t.total)).catch(() => {});
   }
-  async function cargarLista(profileId?: number) {
-    const data = await listOpportunities(undefined, profileId);
-    setPosts(data); setVisibles(PASO);
+  async function cargarLista() {
+    setPosts(await listOpportunities()); setVisibles(PASO);
   }
-
   async function cargarBase() {
     const [meData, perfiles, equipo] = await Promise.all([getMe(), listProfiles(), listTeam()]);
     setMe(meData); setProfiles(perfiles); setTeam(equipo); setLoading(false);
@@ -117,21 +134,25 @@ export default function Dashboard() {
     cargarBase().catch(() => { clearToken(); router.push("/login"); });
   }, [router]);
 
+  // Cambio de vista o de rango → recarga la lista correspondiente.
   useEffect(() => {
     if (!getToken()) return;
-    if (vista === "explorar") reiniciarExplorar();
-    else if (vista === "seguidos") cargarLista().catch(() => setAviso("No se pudo cargar."));
-    else cargarLista(vista).catch(() => setAviso("No se pudo cargar."));
+    if (vista === "seguidos") { cargarLista().catch(() => setAviso("No se pudo cargar.")); return; }
+    profileIdRef.current = typeof vista === "number" ? vista : undefined;
+    diasRef.current = dias;
+    reiniciarExplorar();
+    setTotal(null);
+    explorarTotal(profileIdRef.current, dias).then((t) => setTotal(t.total)).catch(() => setTotal(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vista]);
+  }, [vista, dias]);
 
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
     const obs = new IntersectionObserver((e) => {
       if (!e[0].isIntersecting) return;
-      if (vista === "explorar") cargarMasEx();
-      else setVisibles((v) => v + PASO);
+      if (vista === "seguidos") setVisibles((v) => v + PASO);
+      else cargarMasEx();
     });
     obs.observe(el);
     return () => obs.disconnect();
@@ -143,55 +164,45 @@ export default function Dashboard() {
     try {
       const res = await buscarOportunidades();
       setMe(await getMe());
-      if (vista === "explorar") reiniciarExplorar();
-      else if (vista === "seguidos") await cargarLista();
-      else await cargarLista(vista);
+      if (vista === "seguidos") await cargarLista(); else reiniciarExplorar();
       setAviso(res.nuevas > 0 ? `✓ ${res.nuevas} nueva(s).` : "Sin procesos nuevos por ahora.");
     } catch { setAviso("No se pudo completar la búsqueda."); }
     finally { setBuscando(false); }
   }
 
-  // Agrega/actualiza una postulación en el estado local.
   function upsertPost(post: Postulacion) {
     setPosts((prev) => (prev.some((p) => p.id === post.id) ? prev.map((p) => (p.id === post.id ? post : p)) : [post, ...prev]));
   }
-
   async function seguir(item: ExploreItem, abrir = false, analizarTras = false) {
     setSiguiendo(item.secop_id);
     try {
       const post = await seguirProceso(item.secop_id);
       upsertPost(post);
       setSeguidos((s) => new Set(s).add(item.secop_id));
-      if (analizarTras) {
-        const a = await analizarPostulacion(post.id);
-        upsertPost(a);
-      }
+      if (analizarTras) upsertPost(await analizarPostulacion(post.id));
       if (abrir) setSeleccion(post.id);
-    } finally { setSiguiendo(null); }
+    } catch { setAviso("No se pudo seguir el proceso."); }
+    finally { setSiguiendo(null); }
   }
-
   async function mover(id: number, estado: EstadoPostulacion) { upsertPost(await updatePostulacion(id, { estado })); }
   async function guardarNotas(id: number, notas: string) { upsertPost(await updatePostulacion(id, { notas })); }
-  async function asignar(id: number, assignee_id: number | null) { upsertPost(await updatePostulacion(id, { assignee_id, set_assignee: true })); }
+  async function asignar(id: number, a: number | null) { upsertPost(await updatePostulacion(id, { assignee_id: a, set_assignee: true })); }
   async function analizar(id: number) { upsertPost(await analizarPostulacion(id)); }
   async function asistente(id: number) { upsertPost(await asistentePostulacion(id)); }
   function salir() { clearToken(); router.push("/"); }
 
   if (loading) return <main className="min-h-screen grid place-items-center text-gray-400">Cargando…</main>;
 
-  const explorando = vista === "explorar";
+  const esSeguidos = vista === "seguidos";
   const perfilActivo = typeof vista === "number" ? profiles.find((p) => p.id === vista) : null;
   const visibleProfile = posts.slice(0, visibles);
-  const sentinelVisible = explorando ? hayMasEx : visibles < posts.length;
-  const titulo = explorando ? "Procesos de contratación activos" : vista === "seguidos" ? "Procesos seguidos" : perfilActivo?.name ?? "";
+  const sentinelVisible = esSeguidos ? visibles < posts.length : hayMasEx;
+  const titulo = esSeguidos ? "Procesos seguidos" : perfilActivo ? perfilActivo.name : "Procesos de contratación activos";
 
-  const itemVista = (v: Vista, label: string, icon: string, count?: number) => (
-    <button
-      onClick={() => setVista(v)}
-      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${vista === v ? "bg-brand text-white" : "text-gray-700 hover:bg-gray-100"}`}
-    >
-      <span>{icon} {label}</span>
-      {count != null && <span className={`text-xs ${vista === v ? "text-teal-100" : "text-gray-400"}`}>{count}</span>}
+  const itemNav = (v: Vista, label: string, icon: string) => (
+    <button onClick={() => setVista(v)}
+      className={`w-full rounded-lg px-3 py-2 text-left text-sm ${vista === v ? "bg-brand text-white" : "text-gray-700 hover:bg-gray-100"}`}>
+      {icon} {label}
     </button>
   );
 
@@ -209,8 +220,8 @@ export default function Dashboard() {
       <div className="flex">
         <aside className="w-60 shrink-0 border-r border-gray-200 bg-white p-4">
           <nav className="space-y-1">
-            {itemVista("explorar", "Inicio (explorar)", "🌎")}
-            {itemVista("seguidos", "Procesos seguidos", "❤️", posts.length || undefined)}
+            {itemNav("explorar", "Inicio (explorar)", "🌎")}
+            {itemNav("seguidos", "Procesos seguidos", "❤️")}
             <Link href="/dashboard/equipo" className="block rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">👥 Equipo</Link>
           </nav>
           <div className="mt-5 mb-2 flex items-center justify-between">
@@ -219,11 +230,8 @@ export default function Dashboard() {
           </div>
           <nav className="space-y-1">
             {profiles.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setVista(p.id)}
-                className={`w-full rounded-lg px-3 py-2 text-left text-sm ${vista === p.id ? "bg-brand text-white" : "text-gray-700 hover:bg-gray-100"}`}
-              >
+              <button key={p.id} onClick={() => setVista(p.id)}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm ${vista === p.id ? "bg-brand text-white" : "text-gray-700 hover:bg-gray-100"}`}>
                 <span className="block font-medium">{p.name}</span>
                 <span className={`block text-xs ${vista === p.id ? "text-teal-100" : "text-gray-400"}`}>
                   {p.departamento ?? "Sin zona"}{p.ciudad ? ` · ${p.ciudad}` : ""}
@@ -241,30 +249,39 @@ export default function Dashboard() {
             <div>
               <h1 className="text-2xl font-bold">{titulo}</h1>
               <p className="text-sm text-gray-500">
-                {explorando
-                  ? `Encontrados: ${total != null ? total.toLocaleString("es-CO") : "…"} procesos`
-                  : `${posts.length} proceso(s)`}
+                {esSeguidos
+                  ? `${posts.length} proceso(s)`
+                  : total != null && total >= 0
+                    ? `Encontrados: ${total.toLocaleString("es-CO")} · mostrando ${explorar.length}`
+                    : `Mostrando ${explorar.length}`}
               </p>
             </div>
-            <div className="flex flex-col items-end gap-1">
+            <div className="flex flex-col items-end gap-2">
               <button onClick={buscar} disabled={buscando || profiles.length === 0}
                 className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50">
                 {buscando ? "Buscando…" : "🔄 Buscar ahora"}
               </button>
+              {!esSeguidos && (
+                <label className="flex items-center gap-1 text-xs text-gray-500">
+                  Rango:
+                  <select value={dias} onChange={(e) => setDias(Number(e.target.value))}
+                    className="rounded-lg border border-gray-300 px-2 py-1 text-sm focus:border-brand focus:outline-none">
+                    {RANGOS.map((r) => <option key={r.d} value={r.d}>{r.label}</option>)}
+                  </select>
+                </label>
+              )}
               {aviso && <span className="text-xs text-gray-600">{aviso}</span>}
             </div>
           </div>
 
-          {!explorando && posts.length === 0 && (
+          {esSeguidos && posts.length === 0 && (
             <div className="mt-6 rounded-xl border border-teal-200 bg-teal-50 p-6 text-sm text-gray-600">
-              {vista === "seguidos"
-                ? "Aún no sigues ningún proceso. Ve a “Inicio (explorar)” y dale ❤️ Seguir a los que te interesen."
-                : "Sin oportunidades para este perfil todavía. Presiona “Buscar ahora” o espera al radar."}
+              Aún no sigues ningún proceso. Ve a un perfil o a “Inicio”, y dale ❤️ Seguir a los que te interesen.
             </div>
           )}
 
           <div className="mt-6 grid gap-4 xl:grid-cols-2">
-            {explorando
+            {!esSeguidos
               ? explorar.map((o) => {
                   const yaSeg = seguidos.has(o.secop_id);
                   const cargando = siguiendo === o.secop_id;
@@ -283,20 +300,14 @@ export default function Dashboard() {
                       <p className="text-sm text-gray-600">{fechaHora(o.fecha_publicacion)}</p>
                       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
                         <button onClick={() => seguir(o, true, true)} disabled={cargando}
-                          className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-50">
-                          ✨ Analizar con IA
-                        </button>
+                          className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-50">✨ Analizar con IA</button>
                         <button onClick={() => seguir(o, true)} disabled={cargando}
-                          className="rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark disabled:opacity-50">
-                          Ver más detalles
-                        </button>
+                          className="rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-dark disabled:opacity-50">Ver más detalles</button>
                         <button onClick={() => seguir(o)} disabled={cargando || yaSeg}
                           className={`rounded-lg border px-3 py-1.5 text-xs ${yaSeg ? "border-red-200 text-red-500" : "border-gray-300 text-gray-600 hover:border-brand"}`}>
                           {yaSeg ? "❤️ Siguiendo" : "🤍 Seguir"}
                         </button>
-                        {o.url && (
-                          <a href={o.url} target="_blank" rel="noreferrer" className="ml-auto text-xs text-gray-400 hover:text-brand">SECOP ↗</a>
-                        )}
+                        {o.url && <a href={o.url} target="_blank" rel="noreferrer" className="ml-auto text-xs text-gray-400 hover:text-brand">SECOP ↗</a>}
                       </div>
                     </article>
                   );
@@ -324,13 +335,9 @@ export default function Dashboard() {
                         {post.ia_afinidad != null && <span className="text-gray-500">✨ {post.ia_afinidad}/100</span>}
                         {post.assignee && <span className="text-gray-500">👤 {post.assignee.full_name || post.assignee.email}</span>}
                         <span className="text-brand">Ver detalle →</span>
-                        {sig && (
-                          <button onClick={(e) => { e.stopPropagation(); mover(post.id, sig); }}
-                            className="ml-auto rounded bg-brand px-2 py-1 text-white hover:bg-brand-dark">→ {sig}</button>
-                        )}
+                        {sig && <button onClick={(e) => { e.stopPropagation(); mover(post.id, sig); }} className="ml-auto rounded bg-brand px-2 py-1 text-white hover:bg-brand-dark">→ {sig}</button>}
                         {post.estado !== "descartada" && post.estado !== "ganada" && (
-                          <button onClick={(e) => { e.stopPropagation(); mover(post.id, "descartada"); }}
-                            className="rounded border border-gray-300 px-2 py-1 text-gray-500 hover:border-gray-400">Descartar</button>
+                          <button onClick={(e) => { e.stopPropagation(); mover(post.id, "descartada"); }} className="rounded border border-gray-300 px-2 py-1 text-gray-500 hover:border-gray-400">Descartar</button>
                         )}
                       </div>
                     </article>

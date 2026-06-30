@@ -108,7 +108,17 @@ def _get_con_reintento(client: httpx.Client, params: dict, headers: dict) -> lis
     return []
 
 
-def _where_abiertos(estados: list[str] | None, desde_dias: int | None) -> list[str]:
+def _build_where(
+    *,
+    estados: list[str] | None = None,
+    desde_dias: int | None = None,
+    departamento: str | None = None,
+    ciudad: str | None = None,
+    keywords: list[str] | None = None,
+    exclude: list[str] | None = None,
+    unspsc: list[str] | None = None,
+) -> list[str]:
+    """Cláusulas SoQL compartidas por la lista y el contador (van en sincronía)."""
     clauses: list[str] = []
     if estados:
         en_lista = ",".join(f"'{_escape(e)}'" for e in estados)
@@ -116,6 +126,19 @@ def _where_abiertos(estados: list[str] | None, desde_dias: int | None) -> list[s
     if desde_dias:
         corte = (datetime.now(timezone.utc) - timedelta(days=desde_dias)).strftime("%Y-%m-%dT00:00:00")
         clauses.append(f"fecha_de_publicacion_del >= '{corte}'")
+    if departamento:
+        clauses.append(f"upper(departamento_entidad) like upper('%{_escape(departamento)}%')")
+    if ciudad:
+        clauses.append(f"upper(ciudad_entidad) like upper('%{_escape(ciudad)}%')")
+    # Inclusión por OR: alguna keyword en el objeto, o alguna clase UNSPSC.
+    incl = [f"upper(descripci_n_del_procedimiento) like upper('%{_escape(kw)}%')" for kw in (keywords or [])]
+    incl += [f"codigo_principal_de_categoria like 'V1.{_escape(str(c)[:6])}%'" for c in (unspsc or []) if str(c)[:6]]
+    if incl:
+        clauses.append("(" + " OR ".join(incl) + ")")
+    # Exclusiones: descarta si el objeto contiene alguna palabra vetada.
+    for ex in exclude or []:
+        if ex:
+            clauses.append(f"upper(descripci_n_del_procedimiento) not like upper('%{_escape(ex)}%')")
     return clauses
 
 
@@ -123,18 +146,23 @@ def _headers() -> dict[str, str]:
     return {"X-App-Token": settings.secop_app_token} if settings.secop_app_token else {}
 
 
-def contar(*, estados: list[str] | None = None, desde_dias: int | None = None) -> int:
-    """Total de procesos que cumplen el filtro (para el "Encontrados: N")."""
+def contar(**filtros) -> int:
+    """Total de procesos que cumplen el filtro (para el "Encontrados: N").
+
+    count(*) con filtros LIKE es costoso en Socrata; si tarda, devolvemos -1
+    ("desconocido") en vez de bloquear — el contador es informativo, no crítico.
+    """
     params: dict[str, Any] = {"$select": "count(*)"}
-    where = _where_abiertos(estados, desde_dias)
+    where = _build_where(**filtros)
     if where:
         params["$where"] = " AND ".join(where)
-    with httpx.Client(timeout=60) as client:
-        rows = _get_con_reintento(client, params, _headers())
     try:
-        return int(rows[0]["count"])
-    except (IndexError, KeyError, ValueError):
-        return 0
+        with httpx.Client(timeout=15) as client:
+            resp = client.get(settings.secop_dataset_url, params=params, headers=_headers())
+            resp.raise_for_status()
+            return int(resp.json()[0]["count"])
+    except (httpx.HTTPError, IndexError, KeyError, ValueError):
+        return -1
 
 
 def fetch_uno(secop_id: str) -> dict[str, Any] | None:
@@ -156,31 +184,28 @@ def fetch_pagina(
     limit: int,
     estados: list[str] | None = None,
     desde_dias: int | None = None,
+    departamento: str | None = None,
+    ciudad: str | None = None,
+    keywords: list[str] | None = None,
+    exclude: list[str] | None = None,
+    unspsc: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Una sola página de procesos (para el explorador: scroll de N en N).
+    """Una página de procesos (scroll de N en N), con filtros opcionales.
 
-    A diferencia de fetch_procesos (que recorre todo), trae exactamente
-    [offset, offset+limit) ordenado por publicación reciente. Sirve para
-    navegar TODO SECOP II sin filtro de empresa, cargando de a poco.
+    Sin filtros = explorar todo SECOP II. Con departamento/keywords/UNSPSC =
+    consulta en vivo filtrada por un perfil (todo el histórico, no solo lo
+    guardado), igual que un buscador de licitaciones.
     """
-    headers = {}
-    if settings.secop_app_token:
-        headers["X-App-Token"] = settings.secop_app_token
-
-    where_clauses = []
-    if estados:
-        en_lista = ",".join(f"'{_escape(e)}'" for e in estados)
-        where_clauses.append(f"estado_del_procedimiento in ({en_lista})")
-    if desde_dias:
-        corte = (datetime.now(timezone.utc) - timedelta(days=desde_dias)).strftime("%Y-%m-%dT00:00:00")
-        where_clauses.append(f"fecha_de_publicacion_del >= '{corte}'")
-
+    where_clauses = _build_where(
+        estados=estados, desde_dias=desde_dias, departamento=departamento,
+        ciudad=ciudad, keywords=keywords, exclude=exclude, unspsc=unspsc,
+    )
     params: dict[str, Any] = {"$limit": limit, "$offset": offset, "$order": "fecha_de_publicacion_del DESC"}
     if where_clauses:
         params["$where"] = " AND ".join(where_clauses)
 
     with httpx.Client(timeout=60) as client:
-        rows = _get_con_reintento(client, params, headers)
+        rows = _get_con_reintento(client, params, _headers())
     return [n for r in rows if (n := _normalizar(r))["secop_id"]]
 
 

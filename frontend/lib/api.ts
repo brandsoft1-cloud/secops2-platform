@@ -170,11 +170,17 @@ export interface ExploreItem {
   url: string | null;
 }
 
-export const explorarSecop = (offset: number, limit = 10) =>
-  request<ExploreItem[]>(`/api/opportunities/explorar?offset=${offset}&limit=${limit}`);
+export const explorarSecop = (offset: number, limit = 10, profileId?: number, dias = 30) => {
+  const qs = new URLSearchParams({ offset: String(offset), limit: String(limit), dias: String(dias) });
+  if (profileId != null) qs.set("profile_id", String(profileId));
+  return request<ExploreItem[]>(`/api/opportunities/explorar?${qs}`);
+};
 
-export const explorarTotal = () =>
-  request<{ total: number }>("/api/opportunities/explorar/total");
+export const explorarTotal = (profileId?: number, dias = 30) => {
+  const qs = new URLSearchParams({ dias: String(dias) });
+  if (profileId != null) qs.set("profile_id", String(profileId));
+  return request<{ total: number }>(`/api/opportunities/explorar/total?${qs}`);
+};
 
 // Sigue un proceso del explorador: lo agrega al panel (crea la postulación).
 export const seguirProceso = (secopId: string) =>
