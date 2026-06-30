@@ -74,6 +74,8 @@ class ExploreOut(BaseModel):
     fecha_cierre: datetime | None = None
     url: str | None = None
 
+    model_config = {"from_attributes": True}
+
 
 # --- Documentos ---
 class DocumentoOut(BaseModel):

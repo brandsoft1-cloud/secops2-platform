@@ -23,7 +23,7 @@ from app.schemas.opportunity import (
     PostulacionUpdate,
     SeguirRequest,
 )
-from app.services import ia, secop
+from app.services import ia, mirror, secop
 
 router = APIRouter(prefix="/api/opportunities", tags=["oportunidades"])
 
@@ -75,11 +75,8 @@ def listar(
 
 
 def _filtros_explorar(profile_id, dias, current, db) -> dict:
-    """Arma los filtros de SECOP según el rango (días) y, si aplica, el perfil."""
-    filtros: dict = {
-        "estados": settings.secop_estados_abiertos,
-        "desde_dias": dias,
-    }
+    """Filtros para el espejo local según el rango (días) y, si aplica, el perfil."""
+    filtros: dict = {"desde_dias": dias}
     if profile_id is not None:
         perfil = db.get(SearchProfile, profile_id)
         if not perfil or perfil.company_id != current.company_id:
@@ -108,10 +105,10 @@ def explorar(
 
     `dias` define el rango hacia atrás (30, 180, 365, 730…). Con profile_id,
     además filtra por los criterios del perfil (zona + keywords/UNSPSC + exclusiones).
+    Consulta el ESPEJO LOCAL (rápido), no SECOP en vivo.
     """
     filtros = _filtros_explorar(profile_id, dias, current, db)
-    db.close()  # libera la conexión a la BD antes de la llamada lenta a SECOP
-    return secop.fetch_pagina(offset=offset, limit=limit, **filtros)
+    return mirror.consultar_local(db, offset=offset, limit=limit, **filtros)
 
 
 @router.get("/explorar/total")
@@ -123,8 +120,33 @@ def explorar_total(
 ):
     """Total que cumple el filtro/rango (para el contador "Encontrados: N")."""
     filtros = _filtros_explorar(profile_id, dias, current, db)
-    db.close()  # libera la conexión a la BD antes de la llamada lenta a SECOP
-    return {"total": secop.contar(**filtros)}
+    return {"total": mirror.contar_local(db, **filtros)}
+
+
+@router.post("/mirror")
+def actualizar_espejo(
+    dias: int = Query(default=730, ge=1, le=1825),
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Pobla el espejo local con las zonas (departamentos) de los perfiles activos.
+
+    Ejecútalo cuando agregues un perfil en una zona nueva. Es idempotente.
+    """
+    deptos = {
+        p.departamento
+        for p in db.scalars(
+            select(SearchProfile).where(
+                SearchProfile.company_id == current.company_id,
+                SearchProfile.active.is_(True),
+            )
+        ).all()
+        if p.departamento
+    }
+    total = 0
+    for depto in deptos:
+        total += mirror.ingestar(db, departamento=depto, dias=dias)
+    return {"departamentos": sorted(deptos), "nuevos": total}
 
 
 @router.post("/seguir", response_model=PostulacionOut)
