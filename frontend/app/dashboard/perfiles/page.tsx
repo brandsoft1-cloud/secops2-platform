@@ -32,6 +32,25 @@ const SUGERIDAS = [
 // Palabras que descartan ruido común (p.ej. "alimentación animal").
 const EXCL_SUGERIDAS = ["animal", "veterinario", "pecuario", "bovino", "porcino", "mascotas"];
 
+// Modalidades de contratación de SECOP II (vacío = todas).
+const MODALIDADES = [
+  "Mínima cuantía",
+  "Selección Abreviada de Menor Cuantía",
+  "Seleccion Abreviada Menor Cuantia Sin Manifestacion Interes",
+  "Selección abreviada subasta inversa",
+  "Licitación pública",
+  "Licitación pública Obra Publica",
+  "Licitación Pública Acuerdo Marco de Precios",
+  "Concurso de méritos abierto",
+  "Contratación directa",
+  "Contratación Directa (con ofertas)",
+  "Contratación régimen especial",
+  "Contratación régimen especial (con ofertas)",
+  "Enajenación de bienes con subasta",
+  "Enajenación de bienes con sobre cerrado",
+  "Solicitud de información a los Proveedores",
+];
+
 // Ejemplos de códigos UNSPSC por sector (el usuario usa los de SU RUP). Son
 // orientativos; el matching empareja por clase (primeros 6 dígitos).
 const UNSPSC_SUGERIDOS: { code: string; label: string }[] = [
@@ -55,6 +74,7 @@ type Form = {
   unspsc_codes: string[];
   keywords: string[];
   exclude_keywords: string[];
+  modalidades: string[];
   presupuesto_min: string;
   presupuesto_max: string;
   active: boolean;
@@ -68,6 +88,7 @@ const VACIO: Form = {
   unspsc_codes: [],
   keywords: [],
   exclude_keywords: [],
+  modalidades: [],
   presupuesto_min: "",
   presupuesto_max: "",
   active: true,
@@ -82,6 +103,7 @@ function aForm(p: SearchProfile): Form {
     unspsc_codes: p.unspsc_codes ?? [],
     keywords: p.keywords ?? [],
     exclude_keywords: p.exclude_keywords ?? [],
+    modalidades: p.modalidades ?? [],
     presupuesto_min: p.presupuesto_min?.toString() ?? "",
     presupuesto_max: p.presupuesto_max?.toString() ?? "",
     active: p.active,
@@ -189,6 +211,15 @@ export default function PerfilesPage() {
     setNuevaUnspsc("");
   }
 
+  function toggleModalidad(m: string) {
+    setForm((f) => ({
+      ...f,
+      modalidades: f.modalidades.includes(m)
+        ? f.modalidades.filter((x) => x !== m)
+        : [...f.modalidades, m],
+    }));
+  }
+
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -207,6 +238,7 @@ export default function PerfilesPage() {
       unspsc_codes: form.unspsc_codes,
       keywords: form.keywords,
       exclude_keywords: form.exclude_keywords,
+      modalidades: form.modalidades,
       ciudad: form.ciudad || null,
       departamento: form.departamento,
       presupuesto_min: form.presupuesto_min ? Number(form.presupuesto_min) : null,
@@ -373,6 +405,26 @@ export default function PerfilesPage() {
                   <button type="button" onClick={agregarUnspsc} className="rounded-lg border border-gray-300 px-3 text-sm hover:border-brand">
                     Agregar
                   </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium">Modalidades de contratación</label>
+                <p className="text-xs text-gray-500">Cuáles incluir. Vacío = todas las modalidades.</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {MODALIDADES.map((m) => {
+                    const on = form.modalidades.includes(m);
+                    return (
+                      <button
+                        type="button"
+                        key={m}
+                        onClick={() => toggleModalidad(m)}
+                        className={`rounded-full px-3 py-1 text-xs ${on ? "bg-brand text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                      >
+                        {on ? "✓ " : "+ "}{m}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

@@ -15,6 +15,7 @@ class SearchProfileBase(BaseModel):
     unspsc_codes: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
     exclude_keywords: list[str] = Field(default_factory=list)
+    modalidades: list[str] = Field(default_factory=list)
     ciudad: str | None = None
     departamento: str | None = None
     presupuesto_min: Decimal | None = None

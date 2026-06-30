@@ -48,6 +48,11 @@ def coincide(opp: Opportunity, profile: SearchProfile) -> bool:
         if _normaliza_texto(profile.ciudad) not in _normaliza_texto(opp.ciudad):
             return False
 
+    # Modalidades (vacío = todas).
+    if getattr(profile, "modalidades", None):
+        if opp.modalidad not in profile.modalidades:
+            return False
+
     # Presupuesto
     if opp.valor is not None:
         if profile.presupuesto_min is not None and opp.valor < float(profile.presupuesto_min):

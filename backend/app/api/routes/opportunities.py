@@ -90,6 +90,7 @@ def _filtros_explorar(profile_id, dias, current, db) -> dict:
             keywords=perfil.keywords,
             exclude=perfil.exclude_keywords,
             unspsc=perfil.unspsc_codes,
+            modalidades=perfil.modalidades,
         )
     return filtros
 

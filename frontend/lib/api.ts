@@ -247,6 +247,7 @@ export interface SearchProfile {
   unspsc_codes: string[];
   keywords: string[];
   exclude_keywords: string[];
+  modalidades: string[];
   ciudad: string | null;
   departamento: string | null;
   presupuesto_min: number | null;

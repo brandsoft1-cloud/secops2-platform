@@ -117,12 +117,16 @@ def _build_where(
     keywords: list[str] | None = None,
     exclude: list[str] | None = None,
     unspsc: list[str] | None = None,
+    modalidades: list[str] | None = None,
 ) -> list[str]:
     """Cláusulas SoQL compartidas por la lista y el contador (van en sincronía)."""
     clauses: list[str] = []
     if estados:
         en_lista = ",".join(f"'{_escape(e)}'" for e in estados)
         clauses.append(f"estado_del_procedimiento in ({en_lista})")
+    if modalidades:
+        en_mods = ",".join(f"'{_escape(m)}'" for m in modalidades)
+        clauses.append(f"modalidad_de_contratacion in ({en_mods})")
     if desde_dias:
         corte = (datetime.now(timezone.utc) - timedelta(days=desde_dias)).strftime("%Y-%m-%dT00:00:00")
         clauses.append(f"fecha_de_publicacion_del >= '{corte}'")
@@ -189,6 +193,7 @@ def fetch_pagina(
     keywords: list[str] | None = None,
     exclude: list[str] | None = None,
     unspsc: list[str] | None = None,
+    modalidades: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Una página de procesos (scroll de N en N), con filtros opcionales.
 
@@ -199,6 +204,7 @@ def fetch_pagina(
     where_clauses = _build_where(
         estados=estados, desde_dias=desde_dias, departamento=departamento,
         ciudad=ciudad, keywords=keywords, exclude=exclude, unspsc=unspsc,
+        modalidades=modalidades,
     )
     params: dict[str, Any] = {"$limit": limit, "$offset": offset, "$order": "fecha_de_publicacion_del DESC"}
     if where_clauses:
