@@ -175,7 +175,7 @@ def fetch_uno(secop_id: str) -> dict[str, Any] | None:
         "$where": f"id_del_proceso='{_escape(secop_id)}'",
         "$limit": 1,
     }
-    with httpx.Client(timeout=60) as client:
+    with httpx.Client(timeout=30) as client:
         rows = _get_con_reintento(client, params, _headers())
     if not rows:
         return None
@@ -210,7 +210,7 @@ def fetch_pagina(
     if where_clauses:
         params["$where"] = " AND ".join(where_clauses)
 
-    with httpx.Client(timeout=60) as client:
+    with httpx.Client(timeout=30) as client:
         rows = _get_con_reintento(client, params, _headers())
     return [n for r in rows if (n := _normalizar(r))["secop_id"]]
 
@@ -250,7 +250,7 @@ def fetch_procesos(
 
     offset = 0
     descargados = 0
-    with httpx.Client(timeout=60) as client:
+    with httpx.Client(timeout=30) as client:
         while True:
             params: dict[str, Any] = {"$limit": page_size, "$offset": offset, "$order": "fecha_de_publicacion_del DESC"}
             if where_clauses:

@@ -109,7 +109,9 @@ def explorar(
     `dias` define el rango hacia atrás (30, 180, 365, 730…). Con profile_id,
     además filtra por los criterios del perfil (zona + keywords/UNSPSC + exclusiones).
     """
-    return secop.fetch_pagina(offset=offset, limit=limit, **_filtros_explorar(profile_id, dias, current, db))
+    filtros = _filtros_explorar(profile_id, dias, current, db)
+    db.close()  # libera la conexión a la BD antes de la llamada lenta a SECOP
+    return secop.fetch_pagina(offset=offset, limit=limit, **filtros)
 
 
 @router.get("/explorar/total")
@@ -120,7 +122,9 @@ def explorar_total(
     db: Session = Depends(get_db),
 ):
     """Total que cumple el filtro/rango (para el contador "Encontrados: N")."""
-    return {"total": secop.contar(**_filtros_explorar(profile_id, dias, current, db))}
+    filtros = _filtros_explorar(profile_id, dias, current, db)
+    db.close()  # libera la conexión a la BD antes de la llamada lenta a SECOP
+    return {"total": secop.contar(**filtros)}
 
 
 @router.post("/seguir", response_model=PostulacionOut)
