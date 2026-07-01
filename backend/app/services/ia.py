@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from openai import OpenAI, OpenAIError
+import httpx
 from pydantic import BaseModel, Field, ValidationError
 
 from app.config import settings
@@ -60,34 +60,35 @@ _SCHEMA_ASISTENTE = {
 }
 
 
-def _client() -> OpenAI | None:
-    if not settings.openrouter_api_key:
-        return None
-    return OpenAI(
-        api_key=settings.openrouter_api_key,
-        base_url=settings.openrouter_base_url,
-        default_headers={"X-Title": settings.openrouter_app_name},
-    )
-
-
 def _completar(prompt: str, nombre_esquema: str, esquema: dict, max_tokens: int) -> str | None:
-    """Llama al modelo pidiendo salida JSON estricta; devuelve el texto JSON o None."""
-    client = _client()
-    if client is None:
+    """Llama a OpenRouter (HTTP directo con httpx) pidiendo JSON estricto.
+
+    Usamos httpx, no el SDK de openai, porque el SDK se cuelga en Python 3.14.
+    Devuelve el texto JSON de la respuesta, o None si no hay key o falla.
+    """
+    if not settings.openrouter_api_key:
         logger.info("[IA no configurada] llamada a OpenRouter omitida (%s)", nombre_esquema)
         return None
+    url = settings.openrouter_base_url.rstrip("/") + "/chat/completions"
+    payload = {
+        "model": settings.openrouter_model,
+        "max_tokens": max_tokens,
+        "messages": [{"role": "user", "content": prompt}],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": nombre_esquema, "strict": True, "schema": esquema},
+        },
+    }
+    headers = {
+        "Authorization": f"Bearer {settings.openrouter_api_key}",
+        "Content-Type": "application/json",
+        "X-Title": settings.openrouter_app_name,
+    }
     try:
-        resp = client.chat.completions.create(
-            model=settings.openrouter_model,
-            max_tokens=max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {"name": nombre_esquema, "strict": True, "schema": esquema},
-            },
-        )
-        return resp.choices[0].message.content
-    except OpenAIError:
+        resp = httpx.post(url, json=payload, headers=headers, timeout=45)
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+    except (httpx.HTTPError, KeyError, IndexError, ValueError):
         logger.exception("Error llamando a OpenRouter (%s)", nombre_esquema)
         return None
 

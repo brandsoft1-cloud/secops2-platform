@@ -10,4 +10,4 @@ bcrypt>=4.2.0
 python-multipart>=0.0.20
 httpx>=0.28.1
 email-validator>=2.2.0
-openai>=2.43.0
+# IA por OpenRouter se llama con httpx directo (el SDK openai se cuelga en Python 3.14).
