@@ -1,3 +1,5 @@
+# Requiere Python 3.13 (el 3.14 cuelga bcrypt en el threadpool de uvicorn y el SDK openai).
+# Crear venv:  python3.13 -m venv .venv
 fastapi>=0.115.6
 uvicorn[standard]>=0.34.0
 sqlalchemy>=2.0.36
